@@ -25,16 +25,17 @@ int main(int argc, char **argv)
 	NCField<float> *lonEdgeDst;
 	NCField<float> *angleEdgeDst;
 	NCField<int> *cellsOnEdgeDst;
-	NCField<int> *bdyMaskCellDst;
-	NCField<int> *bdyMaskEdgeDst;
 	NCField<float> *zgridDst;
 	NCField<float> *zmidDst;
 	NCField<float> *zedgeDst;
 	NCField<float> *uDst;
 	NCField<float> *vDst;
 	NCField<float> *thetaDst;
+	NCField<float> *uZonalDst;
+	NCField<float> *uMeridionalDst;
 	NCField<float> *rhoDst;
 	NCField<float> *wDst;
+	NCField<float> *presDst;
 	NCField<float> *qxDst[NUM_SCALARS];
 	NCField<char> *xtime;
 	float ***uDstArr;
@@ -47,9 +48,9 @@ int main(int argc, char **argv)
 	char qxLbcName[64];
 
 	const char *globalMeshFile;
-	const char *regionalMeshFile;
+	const char *targetMeshFile;
 	const char *globalFieldFile;
-	char regionalFieldFile[64];
+	char targetFieldFile[64];
 	char **xtimeArr;
 	char date[14];
 
@@ -75,8 +76,11 @@ int main(int argc, char **argv)
 	NCField<float> *uSrc;
 	NCField<float> *vSrc;
 	NCField<float> *thetaSrc;
+	NCField<float> *uZonalSrc;
+        NCField<float> *uMeridionalSrc;
 	NCField<float> *rhoSrc;
 	NCField<float> *wSrc;
+	NCField<float> *presSrc;
 	NCField<float> *qxSrc[NUM_SCALARS];
 	float ***uSrcArr;
 	float ***vSrcArr;
@@ -98,7 +102,7 @@ int main(int argc, char **argv)
 
 
 	if (argc < 4) {
-		std::cerr << "\nUsage: " << argv[0] << " [--use-reconstruct-winds] <global_IC_file> <regional_IC_file> <global_fields_file>+\n\n";
+		std::cerr << "\nUsage: " << argv[0] << " [--use-reconstruct-winds] <global_IC_file> <target_IC_file> <global_fields_file>+\n\n";
 		return 1;
 	}
 
@@ -122,30 +126,28 @@ int main(int argc, char **argv)
 		use_reconstruct_winds = 0;
 	}
 	globalMeshFile = argv[argv_idx++];
-	regionalMeshFile = argv[argv_idx++];
+	targetMeshFile = argv[argv_idx++];
 
 
 	//
-	// Read mesh description fields from regional IC file
+	// Read mesh description fields from target IC file
 	//
 	start_timer(0);
 	try {
-		latCellDst = new NCField<float>(regionalMeshFile, "latCell");
+		latCellDst = new NCField<float>(targetMeshFile, "latCell");
 	}
 	catch (int e) {
-		std::cerr << "Error reading latCell field from " << globalMeshFile << std::endl;
+		std::cerr << "Error reading latCell field from " << targetMeshFile << std::endl;
 		return 1;
 	}
-	lonCellDst = new NCField<float>(regionalMeshFile, "lonCell");
-	latEdgeDst = new NCField<float>(regionalMeshFile, "latEdge");
-	lonEdgeDst = new NCField<float>(regionalMeshFile, "lonEdge");
-	angleEdgeDst = new NCField<float>(regionalMeshFile, "angleEdge");
-	cellsOnEdgeDst = new NCField<int>(regionalMeshFile, "cellsOnEdge");
-	bdyMaskCellDst = new NCField<int>(regionalMeshFile, "bdyMaskCell");
-	bdyMaskEdgeDst = new NCField<int>(regionalMeshFile, "bdyMaskEdge");
-	zgridDst = new NCField<float>(regionalMeshFile, "zgrid");
+	lonCellDst = new NCField<float>(targetMeshFile, "lonCell");
+	latEdgeDst = new NCField<float>(targetMeshFile, "latEdge");
+	lonEdgeDst = new NCField<float>(targetMeshFile, "lonEdge");
+	angleEdgeDst = new NCField<float>(targetMeshFile, "angleEdge");
+	cellsOnEdgeDst = new NCField<int>(targetMeshFile, "cellsOnEdge");
+	zgridDst = new NCField<float>(targetMeshFile, "zgrid");
 	stop_timer(0, &secs, &nsecs);
-	printf("Time to read mesh fields from %s : %i.%9.9i\n", regionalMeshFile, secs, nsecs);
+	printf("Time to read mesh fields from %s : %i.%9.9i\n", targetMeshFile, secs, nsecs);
 
 
 	//
@@ -178,10 +180,10 @@ int main(int argc, char **argv)
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to read mesh fields from %s : %i.%9.9i\n", globalMeshFile, secs, nsecs);
 
-
+       
 	//
 	// Create fields to hold zgrid averaged to layer midpoints and then averaged to edges
-	// for both the regional and the global meshes
+	// for both the target global and the input global meshes
 	//
 	zmidSrc = new NCField<float>("zmid", 2, "nCells", zgridSrc->dimSize("nCells"), "nVertLevels", zgridSrc->dimSize("nVertLevelsP1")-1);
 	zedgeSrc = new NCField<float>("zedge", 2, "nEdges", latEdgeSrc->dimSize("nEdges"), "nVertLevels", zgridSrc->dimSize("nVertLevelsP1")-1);
@@ -202,7 +204,7 @@ int main(int argc, char **argv)
 
 
 	//
-	// Average regional grid zgrid field to layer midpoints and then to edges
+	// Average target grid zgrid field to layer midpoints and then to edges
 	//
 	start_timer(0);
 	zmidDstArr = zmidDst->ptr2D();
@@ -221,7 +223,7 @@ int main(int argc, char **argv)
 	cellLevelMap->computeWeightsCell(latCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3,
                                       nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                       latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latVertexSrc->ptr1D(), lonVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                      latCellDst->ptr1D(), lonCellDst->ptr1D(), zgridDst->ptr2D(), bdyMaskCellDst->ptr1D());
+                                      latCellDst->ptr1D(), lonCellDst->ptr1D(), zgridDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to create cellLevelMap : %i.%9.9i\n", secs, nsecs);
 
@@ -234,7 +236,7 @@ int main(int argc, char **argv)
 	cellLayerMap->computeWeightsCell(latCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3,
                                       nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                       latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latVertexSrc->ptr1D(), lonVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                      latCellDst->ptr1D(), lonCellDst->ptr1D(), zmidDst->ptr2D(), bdyMaskCellDst->ptr1D());
+                                      latCellDst->ptr1D(), lonCellDst->ptr1D(), zmidDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to create cellLayerMap : %i.%9.9i\n", secs, nsecs);
 
@@ -248,7 +250,7 @@ int main(int argc, char **argv)
 		cellToEdgeMap->computeWeightsCell(latEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3,
                                                   nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                                   latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latVertexSrc->ptr1D(), lonVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                                  latEdgeDst->ptr1D(), lonEdgeDst->ptr1D(), zedgeDst->ptr2D(), bdyMaskCellDst->ptr1D());
+                                                  latEdgeDst->ptr1D(), lonEdgeDst->ptr1D(), zedgeDst->ptr2D());
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to create cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
 	}
@@ -261,17 +263,14 @@ int main(int argc, char **argv)
 	if (!use_reconstruct_winds) {
 		start_timer(0);
 		edgeMap = new RemapperEdge();
-		edgeMap->computeWeightsEdge(latCellSrc->dimSize("nCells"), latEdgeDst->dimSize("nEdges"),
+		edgeMap->computeWeightsEdge(cellsOnCellSrc->dimSize("maxEdges"), latCellSrc->dimSize("nCells"), latEdgeDst->dimSize("nEdges"),
                                             zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"),
                                             nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
                                             latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latEdgeSrc->ptr1D(), lonEdgeSrc->ptr1D(), zedgeSrc->ptr2D(),
-                                            latCellDst->ptr1D(), lonCellDst->ptr1D(), latEdgeDst->ptr1D(), lonEdgeDst->ptr1D(), zedgeDst->ptr2D(), bdyMaskEdgeDst->ptr1D());
+                                            latCellDst->ptr1D(), lonCellDst->ptr1D(), latEdgeDst->ptr1D(), lonEdgeDst->ptr1D(), zedgeDst->ptr2D());
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to create edgeMap : %i.%9.9i\n", secs, nsecs);
 	}
-
-	delete bdyMaskCellDst;
-	delete bdyMaskEdgeDst;
 
 
 	//
@@ -301,6 +300,8 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
+			uZonalSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
+			uMeridionalSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
 		}
 		else {
 			try {
@@ -315,18 +316,22 @@ int main(int argc, char **argv)
 		thetaSrc = new NCField<float>(globalFieldFile, "theta");
 		rhoSrc = new NCField<float>(globalFieldFile, "rho");
 		wSrc = new NCField<float>(globalFieldFile, "w");
+		presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to read time-dependent fields from %s : %i.%9.9i\n", globalFieldFile, secs, nsecs);
 
 
 		//
-		// Allocate fields for interpolated regional fields
+		// Allocate fields for interpolated target mesh fields
 		//
-		uDst = new NCField<float>("lbc_u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		vDst = new NCField<float>("lbc_v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		thetaDst = new NCField<float>("lbc_theta", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		rhoDst = new NCField<float>("lbc_rho", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		wDst = new NCField<float>("lbc_w", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevelsP1", zgridDst->dimSize("nVertLevelsP1"));
+		uDst = new NCField<float>("u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		vDst = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		uZonalDst = new NCField<float>("uReconstructZonal", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		uMeridionalDst = new NCField<float>("uReconstructMeridional", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevelsP1", zgridDst->dimSize("nVertLevelsP1"));
+		presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"));
 
 
 		uSrcArr = uSrc->ptr3D();
@@ -354,23 +359,28 @@ int main(int argc, char **argv)
 
 
 		//
-		// Set up name of regional output file as lbc.yyyy-mm-dd_hh.nc
+		// Set up name of target mesh output file as interpolated.yyyy-mm-dd_hh.nc
 		//
 		xtimeArr = xtime->ptr2D();
 		snprintf(date, (size_t)14, "%s", xtimeArr[0]);
-		snprintf(regionalFieldFile, (size_t)64, "lbc.%s.nc", date);
+		snprintf(targetFieldFile, (size_t)64, "interpolated.%s.nc", date);
 
 
 		//
 		// Create output file and define fields in it
 		//
-		stat = nc_create(regionalFieldFile, NC_64BIT_OFFSET, &ncid);
+		stat = nc_create(targetFieldFile, NC_64BIT_OFFSET, &ncid);
 
 		stat = xtime->defineInFile(ncid);
 		stat = uDst->defineInFile(ncid);
 		stat = thetaDst->defineInFile(ncid);
+		if (use_reconstruct_winds) {
+			stat = uZonalDst->defineInFile(ncid);
+			stat = uMeridionalDst->defineInFile(ncid);
+		}
 		stat = rhoDst->defineInFile(ncid);
 		stat = wDst->defineInFile(ncid);
+		stat = presDst->defineInFile(ncid);
 
 		//
 		// Look for scalars to process (qv, qc, qr, etc.)
@@ -379,7 +389,7 @@ int main(int argc, char **argv)
 			try {
 				qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
 				std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
-				snprintf(qxLbcName, (size_t)64, "lbc_%s", qxNames[i]);
+				snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
 				qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
 				qxDst[i]->remapFrom(*qxSrc[i], *cellLayerMap);
 				stat = qxDst[i]->defineInFile(ncid);
@@ -416,15 +426,18 @@ int main(int argc, char **argv)
 		//
 		thetaDst->remapFrom(*thetaSrc, *cellLayerMap);
 		rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
+		presDst->remapFrom(*presSrc, *cellLayerMap);
 		wDst->remapFrom(*wSrc, *cellLevelMap);
+		if (use_reconstruct_winds) {
+			uZonalDst->remapFrom(*uZonalSrc, *cellLayerMap);
+			uMeridionalDst->remapFrom(*uMeridionalSrc, *cellLayerMap);
+		}
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to remap fields : %i.%9.9i\n", secs, nsecs);
 
-		start_timer(0);
-
 
 		//
-		// Write interpolated regional fields to output file
+		// Write interpolated target mesh fields to output file
 		//
 		start_timer(0);
 		stat = xtime->writeToFile(ncid);
@@ -432,7 +445,12 @@ int main(int argc, char **argv)
 		stat = thetaDst->writeToFile(ncid);
 		stat = rhoDst->writeToFile(ncid);
 		stat = wDst->writeToFile(ncid);
-		stop_timer(0, &secs, &nsecs);
+		stat = presDst->writeToFile(ncid);
+		if (use_reconstruct_winds) {
+			stat = uZonalDst->writeToFile(ncid);
+			stat = uMeridionalDst->writeToFile(ncid);
+		}
+
 
 		for (int i=0; i<NUM_SCALARS; i++) {
 			if (qxDst[i]->valid()) {
@@ -441,23 +459,33 @@ int main(int argc, char **argv)
 			delete(qxDst[i]);
 		}
 
+		stop_timer(0, &secs, &nsecs);
+
 		printf("Time to write output fields : %i.%9.9i\n", secs, nsecs);
 
 		stat = nc_close(ncid);
 
-
 		delete xtime;
-		delete uSrc;
-		delete vSrc;
 		delete thetaSrc;
 		delete rhoSrc;
 		delete wSrc;
+		delete presSrc;
+		delete uSrc;
+		delete vSrc;
+		if (use_reconstruct_winds) {
+			delete uZonalSrc;
+			delete uMeridionalSrc;
+		}
 
-		delete uDst;
-		delete vDst;
 		delete thetaDst;
 		delete rhoDst;
 		delete wDst;
+		delete presDst;
+		delete uDst;
+		delete vDst;
+		delete uZonalDst;
+		delete uMeridionalDst;
+
 	}
 	
 

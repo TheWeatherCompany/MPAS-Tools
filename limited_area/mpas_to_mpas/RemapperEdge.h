@@ -8,15 +8,14 @@ public:
 	RemapperEdge();
 	~RemapperEdge();
 	void remap(const std::type_info& t, int ndims, void *dst, void *src);
-	void computeWeightsEdge(int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst,
+	void computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst,
                                   int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
                                   float *latCellSrc, float *lonCellSrc,
                                   float *latEdgeSrc, float *lonEdgeSrc,
                                   float **levelsSrc,
                                   float *latCellDst, float *lonCellDst,
                                   float *latEdgeDst, float *lonEdgeDst,
-                                  float **levelsDst,
-                                  int *maskDst);
+                                  float **levelsDst);
 
 private:
 	//

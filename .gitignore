@@ -5,6 +5,12 @@
 *.o
 *.mod
 
+# Ignore all *ncl scripts
+*.ncl
+
+# Ignore a.out
+a.out
+
 # Ignore all PNGs
 *.png
 

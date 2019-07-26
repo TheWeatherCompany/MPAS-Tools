@@ -14,8 +14,7 @@ public:
                                   float *latVertexSrc, float *lonVertexSrc,
                                   float **levelsSrc,
                                   float *latCellDst, float *lonCellDst,
-                                  float **levelsDst,
-                                  int *maskDst);
+                                  float **levelsDst);
 
 private:
 	//
