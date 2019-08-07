@@ -10,6 +10,7 @@
 
 # Ignore a.out
 a.out
+mesh_to_mesh_interp
 
 # Ignore all PNGs
 *.png
