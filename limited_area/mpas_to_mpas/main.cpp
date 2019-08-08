@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 	const char *globalFieldFile;
 	char targetFieldFile[64];
 	char **xtimeArr;
-	char date[14];
+	char date[20];
 
 	NCField<float> *latCellSrc;
 	NCField<float> *lonCellSrc;
@@ -362,7 +362,7 @@ int main(int argc, char **argv)
 		// Set up name of target mesh output file as interpolated.yyyy-mm-dd_hh.nc
 		//
 		xtimeArr = xtime->ptr2D();
-		snprintf(date, (size_t)14, "%s", xtimeArr[0]);
+		snprintf(date, (size_t)20, "%s", xtimeArr[0]);
 		snprintf(targetFieldFile, (size_t)64, "interpolated.%s.nc", date);
 
 
