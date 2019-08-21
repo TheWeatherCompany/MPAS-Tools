@@ -365,7 +365,7 @@ int main(int argc, char **argv)
 		//
 		// Create output file and define fields in it
 		//
-		stat = nc_create(targetFieldFile, NC_64BIT_OFFSET, &ncid);
+		stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
 
 		stat = xtime->defineInFile(ncid);
 		stat = thetaDst->defineInFile(ncid);
