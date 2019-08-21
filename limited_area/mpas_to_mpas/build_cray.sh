@@ -1,7 +1,8 @@
 #!/bin/sh
 
 module swap PrgEnv-cray PrgEnv-intel
-module load cray-netcdf
+module unload cray-netcdf
+module load cray-netcdf-hdf5parallel
 export NETCDF=$NETCDF_DIR
 unlink mesh_to_mesh_interp
 ln -sf Makefile.cray Makefile
