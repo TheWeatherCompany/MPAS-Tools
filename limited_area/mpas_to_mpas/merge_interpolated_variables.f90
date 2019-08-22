@@ -35,6 +35,9 @@ program merge_fields
 
     ! only used if creating a new variable
     integer  :: xtype
+    integer  :: i
+    character(len = 500) :: dimname
+    integer, dimension(nf90_max_var_dims) :: dimids_dest
 
 
     ! Process arguments
@@ -63,19 +66,25 @@ program merge_fields
     call check( nf90_inquire_variable(ncid, varid, ndims = numdims, natts = numatts) )
     call check( nf90_inquire_variable(ncid, varid, dimids = dimids) )
     if (.not.dest_has_var) then
+
         ! Get some more information necessary for variable creation
+        !   xtype of the source data
+        !   dimension information (need to figure out what the source dimensions
+        !       are and get the proper IDs for those dimensions in the dest.)
+        !   dimension IDs of the dest. data (to create var using proper IDs)
         call check( nf90_inquire_variable(ncid, varid, xtype = xtype) )
 
-        ! Note that errors that appear here about "NC_UNLIMITED in the wrong
-        ! index" are likely due to differences in the format variant of NetCDF
-        ! (cdf5/64-bit-data, 64-bit-offset, etc.)
-        call check( nf90_redef(ncid_out) )  ! Go into redefine mode to create variable
-        write(*,*) 'Checkpoint-1'
-        write(*,*) 'dimids=',dimids(1:numdims)
-        call check( nf90_def_var(ncid_out, trim(var), xtype, dimids(1:numdims), varid_out) )
-        write(*,*) 'Checkpoint-22'
+        ! Get dimension names of the source data
+        ! Get dimension ids of destination (Using dimension names of source)
+        do i = 1, numdims
+            call check( nf90_inquire_dimension(ncid, dimids(i), dimname) )
+            call check( nf90_inq_dimid(ncid_out, trim(dimname), dimids_dest(i) ) )
+        end do
 
+        call check( nf90_redef(ncid_out) )  ! Go into redefine mode to create variable
+        call check( nf90_def_var(ncid_out, trim(var), xtype, dimids_dest(1:numdims), varid_out) )
         call check( nf90_enddef(ncid_out) )
+
     end if
 
     ! Perform merging (copying from source to destination)
