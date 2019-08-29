@@ -31,8 +31,6 @@ int main(int argc, char **argv)
 	NCField<float> *uDst;
 	NCField<float> *vDst;
 	NCField<float> *thetaDst;
-	NCField<float> *uZonalDst;
-	NCField<float> *uMeridionalDst;
 	NCField<float> *rhoDst;
 	NCField<float> *wDst;
 	NCField<float> *presDst;
@@ -327,8 +325,6 @@ int main(int argc, char **argv)
 		uDst = new NCField<float>("u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
 		vDst = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
 		thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		uZonalDst = new NCField<float>("uReconstructZonal", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		uMeridionalDst = new NCField<float>("uReconstructMeridional", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
 		rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
 		wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevelsP1", zgridDst->dimSize("nVertLevelsP1"));
 		presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"));
@@ -369,15 +365,10 @@ int main(int argc, char **argv)
 		//
 		// Create output file and define fields in it
 		//
-		stat = nc_create(targetFieldFile, NC_64BIT_OFFSET, &ncid);
+		stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
 
 		stat = xtime->defineInFile(ncid);
-		stat = uDst->defineInFile(ncid);
 		stat = thetaDst->defineInFile(ncid);
-		if (use_reconstruct_winds) {
-			stat = uZonalDst->defineInFile(ncid);
-			stat = uMeridionalDst->defineInFile(ncid);
-		}
 		stat = rhoDst->defineInFile(ncid);
 		stat = wDst->defineInFile(ncid);
 		stat = presDst->defineInFile(ncid);
@@ -401,6 +392,7 @@ int main(int argc, char **argv)
 			}
 		}
 
+		stat = uDst->defineInFile(ncid);
 		stat = nc_enddef(ncid);
 
 		//
@@ -428,10 +420,6 @@ int main(int argc, char **argv)
 		rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
 		presDst->remapFrom(*presSrc, *cellLayerMap);
 		wDst->remapFrom(*wSrc, *cellLevelMap);
-		if (use_reconstruct_winds) {
-			uZonalDst->remapFrom(*uZonalSrc, *cellLayerMap);
-			uMeridionalDst->remapFrom(*uMeridionalSrc, *cellLayerMap);
-		}
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to remap fields : %i.%9.9i\n", secs, nsecs);
 
@@ -441,16 +429,10 @@ int main(int argc, char **argv)
 		//
 		start_timer(0);
 		stat = xtime->writeToFile(ncid);
-		stat = uDst->writeToFile(ncid);
 		stat = thetaDst->writeToFile(ncid);
 		stat = rhoDst->writeToFile(ncid);
 		stat = wDst->writeToFile(ncid);
 		stat = presDst->writeToFile(ncid);
-		if (use_reconstruct_winds) {
-			stat = uZonalDst->writeToFile(ncid);
-			stat = uMeridionalDst->writeToFile(ncid);
-		}
-
 
 		for (int i=0; i<NUM_SCALARS; i++) {
 			if (qxDst[i]->valid()) {
@@ -459,13 +441,13 @@ int main(int argc, char **argv)
 			delete(qxDst[i]);
 		}
 
+		stat = uDst->writeToFile(ncid);
 		stop_timer(0, &secs, &nsecs);
 
 		printf("Time to write output fields : %i.%9.9i\n", secs, nsecs);
 
 		stat = nc_close(ncid);
 
-		delete xtime;
 		delete thetaSrc;
 		delete rhoSrc;
 		delete wSrc;
@@ -477,14 +459,13 @@ int main(int argc, char **argv)
 			delete uMeridionalSrc;
 		}
 
-		delete thetaDst;
-		delete rhoDst;
-		delete wDst;
-		delete presDst;
-		delete uDst;
-		delete vDst;
-		delete uZonalDst;
-		delete uMeridionalDst;
+                delete xtime;
+                delete thetaDst;
+                delete presDst;
+                delete rhoDst;
+                delete wDst;
+                delete uDst;
+                delete vDst;
 
 	}
 	

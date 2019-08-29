@@ -11,6 +11,7 @@
 # Ignore a.out
 a.out
 mesh_to_mesh_interp
+merge_fields
 
 # Ignore all PNGs
 *.png
