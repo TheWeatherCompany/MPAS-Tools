@@ -14,7 +14,7 @@
 static const int MAXDIMS = 3;
 
 template <class fieldType>
-class NCField: virtual public NCFieldBase
+class NCField: public NCFieldBase
 {
 public:
 	NCField()
