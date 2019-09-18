@@ -12,7 +12,7 @@ ln -sf Makefile.cray Makefile
 make clean
 make
 if [ -f "a.out" ]; then
-    ln -sf a.out ./mesh_to_mesh_interp
+    cp a.out ./mesh_to_mesh_interp
 fi
 
 # merge_fields
