@@ -6,10 +6,10 @@
 class RemapperEdge : virtual public RemapperBase {
 public:
 	RemapperEdge();
+    RemapperEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst);
 	~RemapperEdge();
 	void remap(const std::type_info& t, int ndims, void *dst, void *src);
-	void computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst,
-                            int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
+	void computeWeightsEdge(int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
                             float *xCellSrc, float *yCellSrc, float *zCellSrc,
                             float *xEdgeSrc, float *yEdgeSrc, float *zEdgeSrc,
                             float **levelsSrc,

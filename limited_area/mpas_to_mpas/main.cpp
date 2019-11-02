@@ -217,9 +217,11 @@ int main(int argc, char **argv)
 	// Compute weights for remapping cell-based fields on levels (only used for w right now)
 	//
 	start_timer(0);
-	cellLevelMap = new RemapperCell();
-	cellLevelMap->computeWeightsCell(xCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3,
-                                      nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+    cellLevelMap = new RemapperCell(xCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3);
+    stop_timer(0, &secs, &nsecs);
+    printf("Time to allocate cellLevelMap : %i.%9.9i\n", secs, nsecs);
+    start_timer(0);
+	cellLevelMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                       xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                       xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
                                       xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zgridDst->ptr2D());
@@ -231,9 +233,11 @@ int main(int argc, char **argv)
 	// Compute weights for remapping cell-based fields on layers
 	//
 	start_timer(0);
-	cellLayerMap = new RemapperCell();
-	cellLayerMap->computeWeightsCell(xCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3,
-                                      nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+	cellLayerMap = new RemapperCell(xCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3);
+    stop_timer(0, &secs, &nsecs);
+    printf("Time to allocate cellLayerMap : %i.%9.9i\n", secs, nsecs);
+    start_timer(0);
+	cellLayerMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                       xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                       xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
                                       xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zmidDst->ptr2D());
@@ -246,9 +250,11 @@ int main(int argc, char **argv)
 	//
 	if (use_reconstruct_winds) {
 		start_timer(0);
-		cellToEdgeMap = new RemapperCell();
-		cellToEdgeMap->computeWeightsCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3,
-                                          nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+		cellToEdgeMap = new RemapperCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3);
+        stop_timer(0, &secs, &nsecs);
+        printf("Time to allocate cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
+        start_timer(0);
+		cellToEdgeMap->computeWeightsCell(nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                           xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                           xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
                                           xEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), zedgeDst->ptr2D());
@@ -265,10 +271,12 @@ int main(int argc, char **argv)
 	//
 	if (!use_reconstruct_winds) {
 		start_timer(0);
-		edgeMap = new RemapperEdge();
-		edgeMap->computeWeightsEdge(cellsOnCellSrc->dimSize("maxEdges"), xCellSrc->dimSize("nCells"), xEdgeDst->dimSize("nEdges"),
-                                    zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"),
-                                    nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
+        edgeMap = new RemapperEdge(cellsOnCellSrc->dimSize("maxEdges"), xCellSrc->dimSize("nCells"), xEdgeDst->dimSize("nEdges"),
+                                   zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"));
+        stop_timer(0, &secs, &nsecs);
+        printf("Time to allocate edgeMap : %i.%9.9i\n", secs, nsecs);
+        start_timer(0);
+		edgeMap->computeWeightsEdge(nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
                                     xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                     xEdgeSrc->ptr1D(), yEdgeSrc->ptr1D(), zEdgeSrc->ptr1D(), zedgeSrc->ptr2D(),
                                     xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(),

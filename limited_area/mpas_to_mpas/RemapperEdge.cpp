@@ -27,6 +27,30 @@ RemapperEdge::RemapperEdge()
 	VSrcWghts3d = NULL;
 }
 
+RemapperEdge::RemapperEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst)
+{
+    nHDstPts = nEdgesDst;
+    maxHSrcPts = maxEdges;
+    nHSrcPts = new int[nHDstPts];   // set to all 1 for now...
+    HSrcPts = new int[(size_t)nHDstPts * (size_t)maxHSrcPts];
+    HSrcPts2d = allocate_2d<int>(nHDstPts, maxHSrcPts, HSrcPts);
+    HSrcWghts = new float[(size_t)nHDstPts * (size_t)maxHSrcPts];
+    HSrcWghts2d = allocate_2d<float>(nHDstPts, maxHSrcPts, HSrcWghts);
+    
+    nVDstPts = nVertLevelsDst;
+    nVSrcLevels = nVertLevelsSrc;
+    maxVSrcPts = 2;
+    
+    if (nVDstPts> 0 && nVSrcLevels > 0) {
+        nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];   // set to all 1 for now...
+        nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
+        VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
+        VSrcPts3d = allocate_3d<int>(nHDstPts, nVDstPts, maxVSrcPts, VSrcPts);
+        VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
+        VSrcWghts3d = allocate_3d<float>(nHDstPts, nVDstPts, maxVSrcPts, VSrcWghts);
+    }
+}
+
 RemapperEdge::~RemapperEdge()
 {
 	if (nHSrcPts != NULL) delete[] nHSrcPts;
@@ -56,8 +80,7 @@ RemapperEdge::~RemapperEdge()
 	}
 }
 
-void RemapperEdge::computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst,
-                                      int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
+void RemapperEdge::computeWeightsEdge(int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
                                       float *xCellSrc, float *yCellSrc, float *zCellSrc,
                                       float *xEdgeSrc, float *yEdgeSrc, float *zEdgeSrc,
                                       float **levelsSrc,
@@ -67,30 +90,10 @@ void RemapperEdge::computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst
 {
 	//const int maxEdges = 7;
 	int j;
-	float tempLevels[nVertLevelsSrc];
+	float tempLevels[nVSrcLevels];
 	float vertCoords[maxEdges][3];
 	float pointInterp[3];
-
-	nHDstPts = nEdgesDst;
-	maxHSrcPts = maxEdges;
-	nHSrcPts = new int[nHDstPts];   // set to all 1 for now...
-	HSrcPts = new int[(size_t)nHDstPts * (size_t)maxHSrcPts];
-	HSrcPts2d = allocate_2d<int>(nHDstPts, maxHSrcPts, HSrcPts);
-	HSrcWghts = new float[(size_t)nHDstPts * (size_t)maxHSrcPts];
-	HSrcWghts2d = allocate_2d<float>(nHDstPts, maxHSrcPts, HSrcWghts);
-    
-    bool do3d = (nVertLevelsSrc > 0 && nVertLevelsDst > 0);
-    if (do3d) {
-        nVDstPts = nVertLevelsDst;
-        nVSrcLevels = nVertLevelsSrc;
-        maxVSrcPts = 2;
-        nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];   // set to all 1 for now...
-        nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
-        VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
-        VSrcPts3d = allocate_3d<int>(nHDstPts, nVDstPts, maxVSrcPts, VSrcPts);
-        VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
-        VSrcWghts3d = allocate_3d<float>(nHDstPts, nVDstPts, maxVSrcPts, VSrcWghts);
-    }
+    bool do3d = (nVDstPts > 0 && nVSrcLevels > 0);
 
 	int jCell = 0;
 #pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
@@ -113,19 +116,19 @@ void RemapperEdge::computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst
 
 		if (do3d) {
 			// Horizontally interpolate column of levelsSrc values
-			for (int k=0; k<nVertLevelsSrc; k++) {
+			for (int k=0; k<nVSrcLevels; k++) {
 				tempLevels[k] = 0;
 			}
 // TODO: How to handle the fact that zgrid is on cells? maybe just pre-compute zgridEdge?
 			for (int j=0; j<nHSrcPts[i]; j++) {
-				for (int k=0; k<nVertLevelsSrc; k++) {
+				for (int k=0; k<nVSrcLevels; k++) {
 					tempLevels[k] += (HSrcWghts2d[i][j] * levelsSrc[HSrcPts2d[i][j]][k]);
 				}
 			}
 
 			// For each vertical destination point, determine weights from tempLevels
 			for (int k=0; k<nVDstPts; k++) {
-				get_weights_1d(nVertLevelsSrc, tempLevels, levelsDst[i][k], &nVSrcPts2d[i][k], VSrcPts3d[i][k], VSrcWghts3d[i][k]);
+				get_weights_1d(nVSrcLevels, tempLevels, levelsDst[i][k], &nVSrcPts2d[i][k], VSrcPts3d[i][k], VSrcWghts3d[i][k]);
 			}
 		}
 	}
