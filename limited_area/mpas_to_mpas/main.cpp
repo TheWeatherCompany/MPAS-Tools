@@ -18,11 +18,9 @@ int main(int argc, char **argv)
 
 	const int NUM_SCALARS = 6;
 	char qxNames[NUM_SCALARS][3] = {"qv", "qc", "qr", "qi", "qs", "qg"};
-
-	NCField<float> *latCellDst;
-	NCField<float> *lonCellDst;
-	NCField<float> *latEdgeDst;
-	NCField<float> *lonEdgeDst;
+    
+    NCField<float> *xCellDst, *yCellDst, *zCellDst;
+    NCField<float> *xEdgeDst, *yEdgeDst, *zEdgeDst;
 	NCField<float> *angleEdgeDst;
 	NCField<int> *cellsOnEdgeDst;
 	NCField<float> *zgridDst;
@@ -52,12 +50,9 @@ int main(int argc, char **argv)
 	char **xtimeArr;
 	char date[20];
 
-	NCField<float> *latCellSrc;
-	NCField<float> *lonCellSrc;
-	NCField<float> *latEdgeSrc;
-	NCField<float> *lonEdgeSrc;
-	NCField<float> *latVertexSrc;
-	NCField<float> *lonVertexSrc;
+    NCField<float> *xCellSrc, *yCellSrc, *zCellSrc;
+    NCField<float> *xEdgeSrc, *yEdgeSrc, *zEdgeSrc;
+    NCField<float> *xVertexSrc, *yVertexSrc, *zVertexSrc;
 	NCField<int> *nEdgesOnCellSrc;
 	NCField<int> *nEdgesOnEdgeSrc;
 	NCField<int> *cellsOnCellSrc;
@@ -132,18 +127,20 @@ int main(int argc, char **argv)
 	//
 	start_timer(0);
 	try {
-		latCellDst = new NCField<float>(targetMeshFile, "latCell");
+		xCellDst = new NCField<float>(targetMeshFile, "xCell");
+        yCellDst = new NCField<float>(targetMeshFile, "yCell");
+        zCellDst = new NCField<float>(targetMeshFile, "zCell");
+        xEdgeDst = new NCField<float>(targetMeshFile, "xEdge");
+        yEdgeDst = new NCField<float>(targetMeshFile, "yEdge");
+        zEdgeDst = new NCField<float>(targetMeshFile, "zEdge");
+        angleEdgeDst = new NCField<float>(targetMeshFile, "angleEdge");
+        cellsOnEdgeDst = new NCField<int>(targetMeshFile, "cellsOnEdge");
+        zgridDst = new NCField<float>(targetMeshFile, "zgrid");
 	}
 	catch (int e) {
-		std::cerr << "Error reading latCell field from " << targetMeshFile << std::endl;
+		std::cerr << "Error reading target fields from " << targetMeshFile << std::endl;
 		return 1;
 	}
-	lonCellDst = new NCField<float>(targetMeshFile, "lonCell");
-	latEdgeDst = new NCField<float>(targetMeshFile, "latEdge");
-	lonEdgeDst = new NCField<float>(targetMeshFile, "lonEdge");
-	angleEdgeDst = new NCField<float>(targetMeshFile, "angleEdge");
-	cellsOnEdgeDst = new NCField<int>(targetMeshFile, "cellsOnEdge");
-	zgridDst = new NCField<float>(targetMeshFile, "zgrid");
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to read mesh fields from %s : %i.%9.9i\n", targetMeshFile, secs, nsecs);
 
@@ -153,28 +150,31 @@ int main(int argc, char **argv)
 	//
 	start_timer(0);
 	try {
-		latCellSrc = new NCField<float>(globalMeshFile, "latCell");
+		xCellSrc = new NCField<float>(globalMeshFile, "xCell");
+        yCellSrc = new NCField<float>(globalMeshFile, "yCell");
+        zCellSrc = new NCField<float>(globalMeshFile, "zCell");
+        xEdgeSrc = new NCField<float>(globalMeshFile, "xEdge");
+        yEdgeSrc = new NCField<float>(globalMeshFile, "yEdge");
+        zEdgeSrc = new NCField<float>(globalMeshFile, "zEdge");
+        xVertexSrc = new NCField<float>(globalMeshFile, "xVertex");
+        yVertexSrc = new NCField<float>(globalMeshFile, "yVertex");
+        zVertexSrc = new NCField<float>(globalMeshFile, "zVertex");
+        nEdgesOnCellSrc = new NCField<int>(globalMeshFile, "nEdgesOnCell");
+        nEdgesOnEdgeSrc = new NCField<int>(globalMeshFile, "nEdgesOnEdge");
+        weightsOnEdgeSrc = new NCField<float>(globalMeshFile, "weightsOnEdge");
+        edgesOnEdgeSrc = new NCField<int>(globalMeshFile, "edgesOnEdge");
+        angleEdgeSrc = new NCField<float>(globalMeshFile, "angleEdge");
+        cellsOnCellSrc = new NCField<int>(globalMeshFile, "cellsOnCell");
+        verticesOnCellSrc = new NCField<int>(globalMeshFile, "verticesOnCell");
+        cellsOnVertexSrc = new NCField<int>(globalMeshFile, "cellsOnVertex");
+        cellsOnEdgeSrc = new NCField<int>(globalMeshFile, "cellsOnEdge");
+        edgesOnCellSrc = new NCField<int>(globalMeshFile, "edgesOnCell");
+        zgridSrc = new NCField<float>(globalMeshFile, "zgrid");
 	}
 	catch (int e) {
-		std::cerr << "Error reading latCell field from " << globalMeshFile << std::endl;
+		std::cerr << "Error reading global mesh fields from " << globalMeshFile << std::endl;
 		return 1;
 	}
-	lonCellSrc = new NCField<float>(globalMeshFile, "lonCell");
-	latEdgeSrc = new NCField<float>(globalMeshFile, "latEdge");
-	lonEdgeSrc = new NCField<float>(globalMeshFile, "lonEdge");
-	latVertexSrc = new NCField<float>(globalMeshFile, "latVertex");
-	lonVertexSrc = new NCField<float>(globalMeshFile, "lonVertex");
-	nEdgesOnCellSrc = new NCField<int>(globalMeshFile, "nEdgesOnCell");
-	nEdgesOnEdgeSrc = new NCField<int>(globalMeshFile, "nEdgesOnEdge");
-	weightsOnEdgeSrc = new NCField<float>(globalMeshFile, "weightsOnEdge");
-	edgesOnEdgeSrc = new NCField<int>(globalMeshFile, "edgesOnEdge");
-	angleEdgeSrc = new NCField<float>(globalMeshFile, "angleEdge");
-	cellsOnCellSrc = new NCField<int>(globalMeshFile, "cellsOnCell");
-	verticesOnCellSrc = new NCField<int>(globalMeshFile, "verticesOnCell");
-	cellsOnVertexSrc = new NCField<int>(globalMeshFile, "cellsOnVertex");
-	cellsOnEdgeSrc = new NCField<int>(globalMeshFile, "cellsOnEdge");
-	edgesOnCellSrc = new NCField<int>(globalMeshFile, "edgesOnCell");
-	zgridSrc = new NCField<float>(globalMeshFile, "zgrid");
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to read mesh fields from %s : %i.%9.9i\n", globalMeshFile, secs, nsecs);
 
@@ -184,9 +184,9 @@ int main(int argc, char **argv)
 	// for both the target global and the input global meshes
 	//
 	zmidSrc = new NCField<float>("zmid", 2, "nCells", zgridSrc->dimSize("nCells"), "nVertLevels", zgridSrc->dimSize("nVertLevelsP1")-1);
-	zedgeSrc = new NCField<float>("zedge", 2, "nEdges", latEdgeSrc->dimSize("nEdges"), "nVertLevels", zgridSrc->dimSize("nVertLevelsP1")-1);
+	zedgeSrc = new NCField<float>("zedge", 2, "nEdges", xEdgeSrc->dimSize("nEdges"), "nVertLevels", zgridSrc->dimSize("nVertLevelsP1")-1);
 	zmidDst = new NCField<float>("zmid", 2, "nCells", zgridDst->dimSize("nCells"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
-	zedgeDst = new NCField<float>("zedge", 2, "nEdges", latEdgeDst->dimSize("nEdges"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
+	zedgeDst = new NCField<float>("zedge", 2, "nEdges", xEdgeDst->dimSize("nEdges"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
 
 
 	//
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
 	zmidSrcArr = zmidSrc->ptr2D();
 	zgridSrcArr = zgridSrc->ptr2D();
 	avg_to_midpoint((int)zmidSrc->dimSize("nCells"), (int)zmidSrc->dimSize("nVertLevels")+1, zgridSrcArr, zmidSrcArr);
-	avg_cell_to_edge((int)latEdgeSrc->dimSize("nEdges"), (int)zmidSrc->dimSize("nVertLevels"), cellsOnEdgeSrc->ptr2D(), zmidSrc->ptr2D(), zedgeSrc->ptr2D());
+	avg_cell_to_edge((int)xEdgeSrc->dimSize("nEdges"), (int)zmidSrc->dimSize("nVertLevels"), cellsOnEdgeSrc->ptr2D(), zmidSrc->ptr2D(), zedgeSrc->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to average zgridSrc to edges: %i.%9.9i\n", secs, nsecs);
 
@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 	zmidDstArr = zmidDst->ptr2D();
 	zgridDstArr = zgridDst->ptr2D();
 	avg_to_midpoint((int)zmidDst->dimSize("nCells"), (int)zmidDst->dimSize("nVertLevels")+1, zgridDstArr, zmidDstArr);
-	avg_cell_to_edge((int)latEdgeDst->dimSize("nEdges"), (int)zmidDst->dimSize("nVertLevels"), cellsOnEdgeDst->ptr2D(), zmidDst->ptr2D(), zedgeDst->ptr2D());
+	avg_cell_to_edge((int)xEdgeDst->dimSize("nEdges"), (int)zmidDst->dimSize("nVertLevels"), cellsOnEdgeDst->ptr2D(), zmidDst->ptr2D(), zedgeDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to average zgridDst to edges: %i.%9.9i\n", secs, nsecs);
 
@@ -218,10 +218,11 @@ int main(int argc, char **argv)
 	//
 	start_timer(0);
 	cellLevelMap = new RemapperCell();
-	cellLevelMap->computeWeightsCell(latCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3,
+	cellLevelMap->computeWeightsCell(xCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3,
                                       nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
-                                      latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latVertexSrc->ptr1D(), lonVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                      latCellDst->ptr1D(), lonCellDst->ptr1D(), zgridDst->ptr2D());
+                                      xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
+                                      xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
+                                      xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zgridDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to create cellLevelMap : %i.%9.9i\n", secs, nsecs);
 
@@ -231,10 +232,11 @@ int main(int argc, char **argv)
 	//
 	start_timer(0);
 	cellLayerMap = new RemapperCell();
-	cellLayerMap->computeWeightsCell(latCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3,
+	cellLayerMap->computeWeightsCell(xCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3,
                                       nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
-                                      latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latVertexSrc->ptr1D(), lonVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                      latCellDst->ptr1D(), lonCellDst->ptr1D(), zmidDst->ptr2D());
+                                      xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
+                                      xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
+                                      xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zmidDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to create cellLayerMap : %i.%9.9i\n", secs, nsecs);
 
@@ -245,10 +247,13 @@ int main(int argc, char **argv)
 	if (use_reconstruct_winds) {
 		start_timer(0);
 		cellToEdgeMap = new RemapperCell();
-		cellToEdgeMap->computeWeightsCell(latEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3,
-                                                  nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
-                                                  latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latVertexSrc->ptr1D(), lonVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                                  latEdgeDst->ptr1D(), lonEdgeDst->ptr1D(), zedgeDst->ptr2D());
+		cellToEdgeMap->computeWeightsCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3,
+                                          nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+                                          xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
+                                          xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
+                                          xEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), zedgeDst->ptr2D());
+        // !! zEdgeDst is the z-coordinate of the edge in Cartesian space,
+        //    zedgeDst is the height field of the edges
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to create cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
 	}
@@ -261,11 +266,13 @@ int main(int argc, char **argv)
 	if (!use_reconstruct_winds) {
 		start_timer(0);
 		edgeMap = new RemapperEdge();
-		edgeMap->computeWeightsEdge(cellsOnCellSrc->dimSize("maxEdges"), latCellSrc->dimSize("nCells"), latEdgeDst->dimSize("nEdges"),
-                                            zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"),
-                                            nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
-                                            latCellSrc->ptr1D(), lonCellSrc->ptr1D(), latEdgeSrc->ptr1D(), lonEdgeSrc->ptr1D(), zedgeSrc->ptr2D(),
-                                            latCellDst->ptr1D(), lonCellDst->ptr1D(), latEdgeDst->ptr1D(), lonEdgeDst->ptr1D(), zedgeDst->ptr2D());
+		edgeMap->computeWeightsEdge(cellsOnCellSrc->dimSize("maxEdges"), xCellSrc->dimSize("nCells"), xEdgeDst->dimSize("nEdges"),
+                                    zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"),
+                                    nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
+                                    xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
+                                    xEdgeSrc->ptr1D(), yEdgeSrc->ptr1D(), zEdgeSrc->ptr1D(), zedgeSrc->ptr2D(),
+                                    xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(),
+                                    zEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), zedgeDst->ptr2D());
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to create edgeMap : %i.%9.9i\n", secs, nsecs);
 	}
@@ -471,20 +478,15 @@ int main(int argc, char **argv)
 	
 
 	delete cellsOnEdgeDst;
-	delete latCellDst;
-	delete lonCellDst;
-	delete latEdgeDst;
-	delete lonEdgeDst;
+    delete xCellDst, yCellDst, zCellDst;
+    delete xEdgeDst, yEdgeDst, zEdgeDst;
 	delete angleEdgeDst;
 	delete zgridDst;
 	delete zedgeDst;
 	delete zmidDst;
-	delete latCellSrc;
-	delete lonCellSrc;
-	delete latEdgeSrc;
-	delete lonEdgeSrc;
-	delete latVertexSrc;
-	delete lonVertexSrc;
+    delete xCellSrc, yCellSrc, zCellSrc;
+    delete xEdgeSrc, yEdgeSrc, zEdgeSrc;
+    delete xVertexSrc, yVertexSrc, zVertexSrc;
 	delete nEdgesOnCellSrc;
 	delete nEdgesOnEdgeSrc;
 	delete weightsOnEdgeSrc;

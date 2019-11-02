@@ -57,9 +57,10 @@ RemapperCell::~RemapperCell()
 }
 
 void RemapperCell::computeWeightsCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree,
-                                          int *nEdgesOnCellSrc, int **verticesOnCellSrc, int **cellsOnVertexSrc,
-                                          float *latCellSrc, float *lonCellSrc, float *latVertexSrc, float *lonVertexSrc, float **levelsSrc,
-                                          float *latCellDst, float *lonCellDst, float **levelsDst)
+                                      int *nEdgesOnCellSrc, int **verticesOnCellSrc, int **cellsOnVertexSrc,
+                                      float *xCellSrc, float *yCellSrc, float *zCellSrc,
+                                      float *xVertexSrc, float *yVertexSrc, float *zVertexSrc, float **levelsSrc,
+                                      float *xCellDst, float *yCellDst, float *zCellDst, float **levelsDst)
 {
 	int j;
 	int nCells;
@@ -79,17 +80,21 @@ void RemapperCell::computeWeightsCell(int nCellsDst, int nVertLevelsSrc, int nVe
 #pragma omp parallel for firstprivate(j) private(pointInterp, vertCoords)
 	for (int i=0; i<nHDstPts; i++) {
 		nHSrcPts[i] = vertexDegree;
-		j = nearest_vertex(latCellDst[i], lonCellDst[i], j, vertexDegree,
-				   nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
-				   latCellSrc, lonCellSrc, latVertexSrc, lonVertexSrc);
+		j = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], j, vertexDegree,
+                           nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
+                           xCellSrc, yCellSrc, zCellSrc, xVertexSrc, yVertexSrc, zVertexSrc);
 		HSrcPts2d[i][0] = cellsOnVertexSrc[j][0] - 1;
 		HSrcPts2d[i][1] = cellsOnVertexSrc[j][1] - 1;
 		HSrcPts2d[i][2] = cellsOnVertexSrc[j][2] - 1;
-
-		convert_lx(&pointInterp[0], &pointInterp[1], &pointInterp[2], 6371229.0, latCellDst[i], lonCellDst[i]);
-		convert_lx(&vertCoords[0][0], &vertCoords[0][1], &vertCoords[0][2], 6371229.0, latCellSrc[HSrcPts2d[i][0]], lonCellSrc[HSrcPts2d[i][0]]);
-		convert_lx(&vertCoords[1][0], &vertCoords[1][1], &vertCoords[1][2], 6371229.0, latCellSrc[HSrcPts2d[i][1]], lonCellSrc[HSrcPts2d[i][1]]);
-		convert_lx(&vertCoords[2][0], &vertCoords[2][1], &vertCoords[2][2], 6371229.0, latCellSrc[HSrcPts2d[i][2]], lonCellSrc[HSrcPts2d[i][2]]);
+        
+        pointInterp[0] = xCellDst;
+        pointInterp[1] = yCellDst;
+        pointInterp[2] = zCellDst;
+        for (int iv=0; iv<vertexDegree; iv++) {
+            vertCoords[iv][0] = xCellSrc[HSrcPts2d[i][iv]];
+            vertCoords[iv][1] = yCellSrc[HSrcPts2d[i][iv]];
+            vertCoords[iv][2] = zCellSrc[HSrcPts2d[i][iv]];
+        }
 
 		mpas_wachspress_coordinates(vertexDegree, vertCoords, pointInterp, HSrcWghts2d[i]);
 	}

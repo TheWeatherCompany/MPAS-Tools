@@ -12,8 +12,8 @@ float sphere_distance(float lat1, float lon1, float lat2, float lon2, float radi
 }
 
 
-int nearest_cell(float target_lat, float target_lon, int start_cell, int nCells,
-                 int *nEdgesOnCell, int **cellsOnCell, float *latCell, float *lonCell)
+int nearest_cell(float target_x, float target_y, float target_z, int start_cell, int nCells,
+                 int *nEdgesOnCell, int **cellsOnCell, float *xCell, float *yCell, float *zCell)
 {
 	int iCell;
 	int current_cell;
@@ -27,13 +27,15 @@ int nearest_cell(float target_lat, float target_lon, int start_cell, int nCells,
 
 	while (retval != current_cell) {
 		current_cell = retval;
-		current_distance = sphere_distance(latCell[current_cell], lonCell[current_cell], target_lat, target_lon, 1.0);
+        current_distance = relative_distance(xCell[current_cell], yCell[current_cell], zCell[current_cell],
+                                             target_x, target_y, target_z);
 		retval = current_cell;
 		nearest_distance = current_distance;
 		for (int i=0; i<nEdgesOnCell[current_cell]; i++) {
 			iCell = cellsOnCell[current_cell][i]-1;
 			if (iCell <= nCells) {
-				d = sphere_distance(latCell[iCell], lonCell[iCell], target_lat, target_lon, 1.0);
+                d = relative_distance(xCell[iCell], yCell[iCell], zCell[iCell],
+                                      target_x, target_y, target_z);
 				if (d < nearest_distance) {
 					retval = iCell;
 					nearest_distance = d;
@@ -46,9 +48,10 @@ int nearest_cell(float target_lat, float target_lon, int start_cell, int nCells,
 }
 
 
-int nearest_vertex(float target_lat, float target_lon, int start_vertex,
+int nearest_vertex(float target_x, float target_y, float target_z, int start_vertex,
                    int vertexDegree, int *nEdgesOnCell, int **verticesOnCell, int **cellsOnVertex,
-                   float *latCell, float *lonCell, float *latVertex, float *lonVertex)
+                   float *xCell, float *yCell, float *zCell,
+                   float *xVertex, float *yVertex, float *zVertex)
 {
 	int i, cell1, cell2, cell3, iCell, iVtx;
 	int current_vertex;
@@ -61,16 +64,17 @@ int nearest_vertex(float target_lat, float target_lon, int start_vertex,
 	
 	while (retval != current_vertex) {
 		current_vertex = retval;
-		current_distance = sphere_distance(latVertex[current_vertex], lonVertex[current_vertex], target_lat, target_lon, 1.0);
+        current_distance = relative_distance(xVertex[current_vertex], yVertex[current_vertex], zVertex[current_vertex],
+                                             target_x, target_y, target_z);
 		retval = current_vertex;
 		nearest_distance = current_distance;
 		cell1 = cellsOnVertex[current_vertex][0]-1;
-		cell1_dist = sphere_distance(latCell[cell1], lonCell[cell1], target_lat, target_lon, 1.0);
+		cell1_dist = relative_distance(xCell[cell1], yCell[cell1], zCell[cell1], target_x, target_y, target_z);
 		cell2 = cellsOnVertex[current_vertex][1]-1;
-		cell2_dist = sphere_distance(latCell[cell2], lonCell[cell2], target_lat, target_lon, 1.0);
+        cell2_dist = relative_distance(xCell[cell2], yCell[cell2], zCell[cell2], target_x, target_y, target_z);
 		if (vertexDegree == 3) {
 			cell3 = cellsOnVertex[current_vertex][2]-1;
-			cell3_dist = sphere_distance(latCell[cell3], lonCell[cell3], target_lat, target_lon, 1.0);
+            cell3_dist = relative_distance(xCell[cell3], yCell[cell3], zCell[cell3], target_x, target_y, target_z);
 		}
 		if (vertexDegree == 3) {
 			if (cell1_dist < cell2_dist) {
@@ -100,7 +104,7 @@ int nearest_vertex(float target_lat, float target_lon, int start_vertex,
 		}
 		for (int i=0; i<nEdgesOnCell[iCell]; i++) {
 			iVtx = verticesOnCell[iCell][i]-1;
-			d = sphere_distance(latVertex[iVtx], lonVertex[iVtx], target_lat, target_lon, 1.0);
+			d = relative_distance(xVertex[iVtx], yVertex[iVtx], zVertex[iVtx], target_x, target_y, target_z);
 			if (d < nearest_distance) {
 				retval = iVtx;
 				nearest_distance = d;
@@ -117,17 +121,12 @@ int nearest_vertex(float target_lat, float target_lon, int start_vertex,
 // same sphere centered at the origin.
 float mpas_arc_length(float ax, float ay, float az, float bx, float by, float bz)
 {
-	float r, c;
-	float cx, cy, cz;
+    return acos(ax * bx + ay * by + az * bz);
+}
 
-	cx = bx - ax;
-	cy = by - ay;
-	cz = bz - az;
-
-	r = sqrtf(ax*ax + ay*ay + az*az);
-	c = sqrtf(cx*cx + cy*cy + cz*cz);
-
-	return 2.0 * r * asinf(c/(2.0*r));
+float relative_distance(float ax, float ay, float az, float bx, float by, float bz)
+{
+    return -(ax * bx + ay * by + az * bz);
 }
 
 
@@ -212,11 +211,7 @@ void mpas_wachspress_coordinates(int nVertices, float vertCoords[][3], float *po
 	float areaA[nVertices];
 	float areaB[nVertices];
 
-	float radiusLocal;
-
-// TODO:	radiusLocal = sqrtf(sum(vertCoords(:,1)**2))
-	
-	radiusLocal = 6371229.0;
+	float radiusLocal = 1.0;
 
 	// compute areas
 	for (int i=0; i<nVertices; i++) {

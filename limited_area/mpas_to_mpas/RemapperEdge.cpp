@@ -57,13 +57,13 @@ RemapperEdge::~RemapperEdge()
 }
 
 void RemapperEdge::computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst,
-                                          int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
-                                          float *latCellSrc, float *lonCellSrc,
-                                          float *latEdgeSrc, float *lonEdgeSrc,
-                                          float **levelsSrc,
-                                          float *latCellDst, float *lonCellDst,
-                                          float *latEdgeDst, float *lonEdgeDst,
-                                          float **levelsDst)
+                                      int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
+                                      float *xCellSrc, float *yCellSrc, float *zCellSrc,
+                                      float *xEdgeSrc, float *yEdgeSrc, float *zEdgeSrc,
+                                      float **levelsSrc,
+                                      float *xCellDst, float *yCellDst, float *zCellDst,
+                                      float *xEdgeDst, float *yEdgeDst, float *zEdgeDst,
+                                      float **levelsDst)
 {
 	//const int maxEdges = 7;
 	int j;
@@ -82,14 +82,18 @@ void RemapperEdge::computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst
 	j = 0;
 #pragma omp parallel for firstprivate(j) private(pointInterp, vertCoords)
 	for (int i=0; i<nHDstPts; i++) {
-		j = nearest_cell(latEdgeDst[i], lonEdgeDst[i], j, nCellsSrc,
-				 nEdgesOnCellSrc, cellsOnCellSrc, latCellSrc, lonCellSrc);
+		j = nearest_cell(xEdgeDst[i], yEdgeDst[i], zEdgeDst[i], j, nCellsSrc,
+                         nEdgesOnCellSrc, cellsOnCellSrc, xCellSrc, yCellSrc, zCellSrc);
 		nHSrcPts[i] = nEdgesOnCellSrc[j];
 
-		convert_lx(&pointInterp[0], &pointInterp[1], &pointInterp[2], 6371229.0, latEdgeDst[i], lonEdgeDst[i]);
+        pointInterp[0] = xEdgeDst[i];
+        pointInterp[1] = yEdgeDst[i];
+        pointInterp[2] = zEdgeDst[i];
 		for (int k=0; k<nHSrcPts[i]; k++) {
 			HSrcPts2d[i][k] = edgesOnCellSrc[j][k] - 1;
-			convert_lx(&vertCoords[k][0], &vertCoords[k][1], &vertCoords[k][2], 6371229.0, latEdgeSrc[HSrcPts2d[i][k]], lonEdgeSrc[HSrcPts2d[i][k]]);
+            vertCoords[k][0] = xEdgeSrc[HSrcPts2d[i][k]];
+            vertCoords[k][1] = xEdgeSrc[HSrcPts2d[i][k]];
+            vertCoords[k][2] = xEdgeSrc[HSrcPts2d[i][k]];
 		}
 
 		mpas_wachspress_coordinates(nHSrcPts[i], vertCoords, pointInterp, HSrcWghts2d[i]);
