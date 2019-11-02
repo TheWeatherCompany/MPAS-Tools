@@ -78,40 +78,40 @@ void RemapperEdge::computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst
 	HSrcPts2d = allocate_2d<int>(nHDstPts, maxHSrcPts, HSrcPts);
 	HSrcWghts = new float[(size_t)nHDstPts * (size_t)maxHSrcPts];
 	HSrcWghts2d = allocate_2d<float>(nHDstPts, maxHSrcPts, HSrcWghts);
+    
+    bool do3d = (nVertLevelsSrc > 0 && nVertLevelsDst > 0);
+    if (do3d) {
+        nVDstPts = nVertLevelsDst;
+        nVSrcLevels = nVertLevelsSrc;
+        maxVSrcPts = 2;
+        nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];   // set to all 1 for now...
+        nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
+        VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
+        VSrcPts3d = allocate_3d<int>(nHDstPts, nVDstPts, maxVSrcPts, VSrcPts);
+        VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
+        VSrcWghts3d = allocate_3d<float>(nHDstPts, nVDstPts, maxVSrcPts, VSrcWghts);
+    }
 
-	j = 0;
-#pragma omp parallel for firstprivate(j) private(pointInterp, vertCoords)
+	int jCell = 0;
+#pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
 	for (int i=0; i<nHDstPts; i++) {
-		j = nearest_cell(xEdgeDst[i], yEdgeDst[i], zEdgeDst[i], j, nCellsSrc,
-                         nEdgesOnCellSrc, cellsOnCellSrc, xCellSrc, yCellSrc, zCellSrc);
-		nHSrcPts[i] = nEdgesOnCellSrc[j];
+		jCell = nearest_cell(xEdgeDst[i], yEdgeDst[i], zEdgeDst[i], jCell, nCellsSrc,
+                             nEdgesOnCellSrc, cellsOnCellSrc, xCellSrc, yCellSrc, zCellSrc);
+		nHSrcPts[i] = nEdgesOnCellSrc[jCell];
 
         pointInterp[0] = xEdgeDst[i];
         pointInterp[1] = yEdgeDst[i];
         pointInterp[2] = zEdgeDst[i];
 		for (int k=0; k<nHSrcPts[i]; k++) {
-			HSrcPts2d[i][k] = edgesOnCellSrc[j][k] - 1;
+			HSrcPts2d[i][k] = edgesOnCellSrc[jCell][k] - 1;
             vertCoords[k][0] = xEdgeSrc[HSrcPts2d[i][k]];
             vertCoords[k][1] = xEdgeSrc[HSrcPts2d[i][k]];
             vertCoords[k][2] = xEdgeSrc[HSrcPts2d[i][k]];
 		}
 
 		mpas_wachspress_coordinates(nHSrcPts[i], vertCoords, pointInterp, HSrcWghts2d[i]);
-	}
 
-	if (nVertLevelsSrc > 0 && nVertLevelsDst > 0) {
-		nVDstPts = nVertLevelsDst;
-		nVSrcLevels = nVertLevelsSrc;
-		maxVSrcPts = 2;
-		nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];   // set to all 1 for now...
-		nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
-		VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
-		VSrcPts3d = allocate_3d<int>(nHDstPts, nVDstPts, maxVSrcPts, VSrcPts);
-		VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
-		VSrcWghts3d = allocate_3d<float>(nHDstPts, nVDstPts, maxVSrcPts, VSrcWghts);
-
-#pragma omp parallel for private(tempLevels)
-		for (int i=0; i<nHDstPts; i++) {
+		if (do3d) {
 			// Horizontally interpolate column of levelsSrc values
 			for (int k=0; k<nVertLevelsSrc; k++) {
 				tempLevels[k] = 0;
