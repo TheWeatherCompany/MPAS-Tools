@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	RemapperCell *cellLevelMap;
 	RemapperCell *cellToEdgeMap;
 	RemapperEdge *edgeMap;
-	int secs, nsecs;
+    int secs, nsecs, tsecs, tnsecs;
 	int itime;
 	int argv_idx;
 	int use_reconstruct_winds;
@@ -220,6 +220,7 @@ int main(int argc, char **argv)
     cellLevelMap = new RemapperCell(xCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3);
     stop_timer(0, &secs, &nsecs);
     printf("Time to allocate cellLevelMap : %i.%9.9i\n", secs, nsecs);
+    tsecs = secs; tnsecs = nsecs;
     start_timer(0);
 	cellLevelMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                       xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
@@ -227,6 +228,8 @@ int main(int argc, char **argv)
                                       xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zgridDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to create cellLevelMap : %i.%9.9i\n", secs, nsecs);
+    tsecs += secs; tnsecs += nsecs;
+    printf("Total Time to create cellLevelMap : %i.%9.9i\n", tsecs, tnsecs);
 
 
 	//
@@ -236,6 +239,7 @@ int main(int argc, char **argv)
 	cellLayerMap = new RemapperCell(xCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3);
     stop_timer(0, &secs, &nsecs);
     printf("Time to allocate cellLayerMap : %i.%9.9i\n", secs, nsecs);
+    tsecs = secs; tnsecs = nsecs;
     start_timer(0);
 	cellLayerMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                       xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
@@ -243,6 +247,8 @@ int main(int argc, char **argv)
                                       xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zmidDst->ptr2D());
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to create cellLayerMap : %i.%9.9i\n", secs, nsecs);
+    tsecs += secs; tnsecs += nsecs;
+    printf("Total Time to create cellLayerMap : %i.%9.9i\n", tsecs, tnsecs);
 
 
 	//
@@ -253,6 +259,7 @@ int main(int argc, char **argv)
 		cellToEdgeMap = new RemapperCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3);
         stop_timer(0, &secs, &nsecs);
         printf("Time to allocate cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
+        tsecs = secs; tnsecs = nsecs;
         start_timer(0);
 		cellToEdgeMap->computeWeightsCell(nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                           xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
@@ -262,6 +269,8 @@ int main(int argc, char **argv)
         //    zedgeDst is the height field of the edges
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to create cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
+        tsecs += secs; tnsecs += nsecs;
+        printf("Total Time to create cellToEdgeMap : %i.%9.9i\n", tsecs, tnsecs);
 	}
 
 
@@ -275,6 +284,7 @@ int main(int argc, char **argv)
                                    zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"));
         stop_timer(0, &secs, &nsecs);
         printf("Time to allocate edgeMap : %i.%9.9i\n", secs, nsecs);
+        tsecs = secs; tnsecs = nsecs;
         start_timer(0);
 		edgeMap->computeWeightsEdge(nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
                                     xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
@@ -283,6 +293,8 @@ int main(int argc, char **argv)
                                     zEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), zedgeDst->ptr2D());
 		stop_timer(0, &secs, &nsecs);
 		printf("Time to create edgeMap : %i.%9.9i\n", secs, nsecs);
+        tsecs += secs; tnsecs += nsecs;
+        printf("Total Time to create edgeMap : %i.%9.9i\n", tsecs, tnsecs);
 	}
 
 

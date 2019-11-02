@@ -21,6 +21,7 @@ private:
 	//
 	// Horizontal remapping fields
 	//
+    int nCellSrcPts;
 	int nHDstPts;      // Number of horizontal destination points
 	int maxHSrcPts;    // Maximum number of horizontal source points needed by any destination point
 	int *nHSrcPts;     // Number of horizontal source points needed by any destination point

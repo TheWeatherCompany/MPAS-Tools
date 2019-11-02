@@ -87,31 +87,31 @@ void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCell
 	int j;
 	int nCells;
 	float tempLevels[nVSrcLevels];
-	float vertCoords[vertexDegree][3];
+	float vertCoords[maxHSrcPts][3];
 	float pointInterp[3];
     bool do3d = (nVSrcLevels > 0 && nVDstPts > 0);
 
 	int jCell = 0;
 #pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
 	for (int i=0; i<nHDstPts; i++) {
-		nHSrcPts[i] = vertexDegree;
-		jCell = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], jCell, vertexDegree,
+		nHSrcPts[i] = maxHSrcPts;
+		jCell = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], jCell, maxHSrcPts,
                            nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
                            xCellSrc, yCellSrc, zCellSrc, xVertexSrc, yVertexSrc, zVertexSrc);
 		HSrcPts2d[i][0] = cellsOnVertexSrc[jCell][0] - 1;
 		HSrcPts2d[i][1] = cellsOnVertexSrc[jCell][1] - 1;
 		HSrcPts2d[i][2] = cellsOnVertexSrc[jCell][2] - 1;
         
-        pointInterp[0] = xCellDst;
-        pointInterp[1] = yCellDst;
-        pointInterp[2] = zCellDst;
-        for (int iv=0; iv<vertexDegree; iv++) {
+        pointInterp[0] = xCellDst[i];
+        pointInterp[1] = yCellDst[i];
+        pointInterp[2] = zCellDst[i];
+        for (int iv=0; iv<maxHSrcPts; iv++) {
             vertCoords[iv][0] = xCellSrc[HSrcPts2d[i][iv]];
             vertCoords[iv][1] = yCellSrc[HSrcPts2d[i][iv]];
             vertCoords[iv][2] = zCellSrc[HSrcPts2d[i][iv]];
         }
 
-		mpas_wachspress_coordinates(vertexDegree, vertCoords, pointInterp, HSrcWghts2d[i]);
+		mpas_wachspress_coordinates(maxHSrcPts, vertCoords, pointInterp, HSrcWghts2d[i]);
 
 		if (do3d) {
 			// Horizontally interpolate column of levelsSrc values

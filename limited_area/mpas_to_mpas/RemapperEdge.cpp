@@ -8,6 +8,8 @@
 
 RemapperEdge::RemapperEdge()
 {
+    nCellSrcPts = 0;
+    
 	nHDstPts = 0;
 	maxHSrcPts = 0;
 	nHSrcPts = NULL;
@@ -29,6 +31,8 @@ RemapperEdge::RemapperEdge()
 
 RemapperEdge::RemapperEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst)
 {
+    nCellSrcPts = nCellsSrc;
+    
     nHDstPts = nEdgesDst;
     maxHSrcPts = maxEdges;
     nHSrcPts = new int[nHDstPts];   // set to all 1 for now...
@@ -88,17 +92,16 @@ void RemapperEdge::computeWeightsEdge(int *nEdgesOnCellSrc, int **cellsOnCellSrc
                                       float *xEdgeDst, float *yEdgeDst, float *zEdgeDst,
                                       float **levelsDst)
 {
-	//const int maxEdges = 7;
 	int j;
 	float tempLevels[nVSrcLevels];
-	float vertCoords[maxEdges][3];
+	float vertCoords[maxHSrcPts][3];
 	float pointInterp[3];
     bool do3d = (nVDstPts > 0 && nVSrcLevels > 0);
 
 	int jCell = 0;
 #pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
 	for (int i=0; i<nHDstPts; i++) {
-		jCell = nearest_cell(xEdgeDst[i], yEdgeDst[i], zEdgeDst[i], jCell, nCellsSrc,
+		jCell = nearest_cell(xEdgeDst[i], yEdgeDst[i], zEdgeDst[i], jCell, nCellSrcPts,
                              nEdgesOnCellSrc, cellsOnCellSrc, xCellSrc, yCellSrc, zCellSrc);
 		nHSrcPts[i] = nEdgesOnCellSrc[jCell];
 
