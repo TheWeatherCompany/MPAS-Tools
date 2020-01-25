@@ -1,0 +1,14 @@
+Author: John Wong
+Date: 01/24/2020
+
+usage: gen_cvt_partition.py [-h] [-g GRID_FILE] centroids [centroids ...]
+
+Assign MPAS cell points to convex partitions specified by centroids.
+
+positional arguments:
+centroids     Text file(s) containing cartesian coordinates for partitioning
+              centroids
+
+optional arguments:
+-h, --help    show this help message and exit
+-g GRID_FILE  NetCDF file containing {x,y,z}Cell. (default: grid.nc)
