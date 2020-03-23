@@ -127,15 +127,48 @@ int main(int argc, char **argv)
 	//
 	start_timer(0);
 	try {
-		xCellDst = new NCField<float>(targetMeshFile, "xCell");
-        yCellDst = new NCField<float>(targetMeshFile, "yCell");
-        zCellDst = new NCField<float>(targetMeshFile, "zCell");
-        xEdgeDst = new NCField<float>(targetMeshFile, "xEdge");
-        yEdgeDst = new NCField<float>(targetMeshFile, "yEdge");
-        zEdgeDst = new NCField<float>(targetMeshFile, "zEdge");
-        angleEdgeDst = new NCField<float>(targetMeshFile, "angleEdge");
-        cellsOnEdgeDst = new NCField<int>(targetMeshFile, "cellsOnEdge");
-        zgridDst = new NCField<float>(targetMeshFile, "zgrid");
+        int stat, ncid;
+        stat = nc_open(targetMeshFile, NC_SHARE, &ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
+        
+		xCellDst = new NCField<float>(ncid, "xCell");
+        yCellDst = new NCField<float>(ncid, "yCell");
+        zCellDst = new NCField<float>(ncid, "zCell");
+        xEdgeDst = new NCField<float>(ncid, "xEdge");
+        yEdgeDst = new NCField<float>(ncid, "yEdge");
+        zEdgeDst = new NCField<float>(ncid, "zEdge");
+        angleEdgeDst = new NCField<float>(ncid, "angleEdge");
+        cellsOnEdgeDst = new NCField<int>(ncid, "cellsOnEdge");
+        zgridDst = new NCField<float>(ncid, "zgrid");
+        
+        float sphere_radius;
+        stat = nc_get_att_float (ncid, NC_GLOBAL, "sphere_radius", &sphere_radius);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
+        
+        stat = nc_close(ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
+        
+        // normalize
+        size_t nCells = static_cast<size_t>(xCellDst->dimSize("nCells"));
+#pragma omp parallel for simd
+        for (size_t i=0; i<nCells; i++) {
+            xCellDst[i] /= sphere_radius;
+            yCellDst[i] /= sphere_radius;
+            zCellDst[i] /= sphere_radius;
+        }
+        size_t nEdges = static_cast<size_t)(xEdgeDst->dimSize("nEdges"));
+#pragma omp parallel for simd
+        for (size_t i=0; i<nEdges; i++) {
+            xEdgeDst[i] /= sphere_radius;
+            yEdgeDst[i] /= sphere_radius;
+            zEdgeDst[i] /= sphere_radius;
+        }
 	}
 	catch (int e) {
 		std::cerr << "Error reading target fields from " << targetMeshFile << std::endl;
@@ -150,26 +183,66 @@ int main(int argc, char **argv)
 	//
 	start_timer(0);
 	try {
-		xCellSrc = new NCField<float>(globalMeshFile, "xCell");
-        yCellSrc = new NCField<float>(globalMeshFile, "yCell");
-        zCellSrc = new NCField<float>(globalMeshFile, "zCell");
-        xEdgeSrc = new NCField<float>(globalMeshFile, "xEdge");
-        yEdgeSrc = new NCField<float>(globalMeshFile, "yEdge");
-        zEdgeSrc = new NCField<float>(globalMeshFile, "zEdge");
-        xVertexSrc = new NCField<float>(globalMeshFile, "xVertex");
-        yVertexSrc = new NCField<float>(globalMeshFile, "yVertex");
-        zVertexSrc = new NCField<float>(globalMeshFile, "zVertex");
-        nEdgesOnCellSrc = new NCField<int>(globalMeshFile, "nEdgesOnCell");
-        nEdgesOnEdgeSrc = new NCField<int>(globalMeshFile, "nEdgesOnEdge");
-        weightsOnEdgeSrc = new NCField<float>(globalMeshFile, "weightsOnEdge");
-        edgesOnEdgeSrc = new NCField<int>(globalMeshFile, "edgesOnEdge");
-        angleEdgeSrc = new NCField<float>(globalMeshFile, "angleEdge");
-        cellsOnCellSrc = new NCField<int>(globalMeshFile, "cellsOnCell");
-        verticesOnCellSrc = new NCField<int>(globalMeshFile, "verticesOnCell");
-        cellsOnVertexSrc = new NCField<int>(globalMeshFile, "cellsOnVertex");
-        cellsOnEdgeSrc = new NCField<int>(globalMeshFile, "cellsOnEdge");
-        edgesOnCellSrc = new NCField<int>(globalMeshFile, "edgesOnCell");
-        zgridSrc = new NCField<float>(globalMeshFile, "zgrid");
+        int stat, ncid;
+        stat = nc_open(targetMeshFile, NC_SHARE, &ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
+        
+		xCellSrc = new NCField<float>(ncid, "xCell");
+        yCellSrc = new NCField<float>(ncid, "yCell");
+        zCellSrc = new NCField<float>(ncid, "zCell");
+        xEdgeSrc = new NCField<float>(ncid, "xEdge");
+        yEdgeSrc = new NCField<float>(ncid, "yEdge");
+        zEdgeSrc = new NCField<float>(ncid, "zEdge");
+        xVertexSrc = new NCField<float>(ncid, "xVertex");
+        yVertexSrc = new NCField<float>(ncid, "yVertex");
+        zVertexSrc = new NCField<float>(ncid, "zVertex");
+        nEdgesOnCellSrc = new NCField<int>(ncid, "nEdgesOnCell");
+        nEdgesOnEdgeSrc = new NCField<int>(ncid, "nEdgesOnEdge");
+        weightsOnEdgeSrc = new NCField<float>(ncid, "weightsOnEdge");
+        edgesOnEdgeSrc = new NCField<int>(ncid, "edgesOnEdge");
+        angleEdgeSrc = new NCField<float>(ncid, "angleEdge");
+        cellsOnCellSrc = new NCField<int>(ncid, "cellsOnCell");
+        verticesOnCellSrc = new NCField<int>(ncid, "verticesOnCell");
+        cellsOnVertexSrc = new NCField<int>(ncid, "cellsOnVertex");
+        cellsOnEdgeSrc = new NCField<int>(ncid, "cellsOnEdge");
+        edgesOnCellSrc = new NCField<int>(ncid, "edgesOnCell");
+        zgridSrc = new NCField<float>(ncid, "zgrid");
+        
+        float sphere_radius;
+        stat = nc_get_att_float (ncid, NC_GLOBAL, "sphere_radius", &sphere_radius);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
+        
+        stat = nc_close(ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
+        
+        // normalize
+        size_t nCells = static_cast<size_t>(xCellSrc->dimSize("nCells"));
+#pragma omp parallel for simd
+        for (size_t i=0; i<nCells; i++) {
+            xCellSrc[i] /= sphere_radius;
+            yCellSrc[i] /= sphere_radius;
+            zCellSrc[i] /= sphere_radius;
+        }
+        size_t nEdges = static_cast<size_t)(xEdgeSrc->dimSize("nEdges"));
+#pragma omp parallel for simd
+        for (size_t i=0; i<nEdges; i++) {
+            xEdgeSrc[i] /= sphere_radius;
+            yEdgeSrc[i] /= sphere_radius;
+            zEdgeSrc[i] /= sphere_radius;
+        }
+        size_t nVertices = static_cast<size_t)(xVertexSrc->dimSize("nVertices"));
+#pragma omp parallel for simd
+        for (size_t i=0; i<nEdges; i++) {
+            xVertexSrc[i] /= sphere_radius;
+            yVertexSrc[i] /= sphere_radius;
+            zVertexSrc[i] /= sphere_radius;
+        }
 	}
 	catch (int e) {
 		std::cerr << "Error reading global mesh fields from " << globalMeshFile << std::endl;
