@@ -467,10 +467,14 @@ int main(int argc, char **argv)
 		// Create output file and define fields in it
 		//
 		stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
+        stat = xtime->defineInFile(ncid);
+        stat = xtime->writeToFile(ncid);
+        delete xtime;
 
 		//
 		// Look for scalars to process (qv, qc, qr, etc.)
 		//
+        start_timer(0);
 		for (int i=0; i<NUM_SCALARS; i++) {
 			try {
 				qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
@@ -491,13 +495,15 @@ int main(int argc, char **argv)
             }
             delete(qxDst[i]);
 		}
+        
+        stop_timer(0, &secs, &nsecs);
+        printf("Time to remap and write scalars : %i.%9.9i\n", secs, nsecs);
 
-		stat = uDst->defineInFile(ncid);
+        start_timer(0);
 
 		//
 		// Interpolate the zonal and meridional winds, and rotate the wind vector field so that u is the normal component
 		//
-		start_timer(0);
 		uDstArr = uDst->ptr3D();
 		vDstArr = vDst->ptr3D();
 		angleEdgeDstArr = angleEdgeDst->ptr1D();
@@ -511,6 +517,9 @@ int main(int argc, char **argv)
 		}
 		rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
         
+        stat = uDst->defineInFile(ncid);
+        stat = uDst->writeToFile(ncid);
+        
         delete uSrc;
         delete vSrc;
         delete uDst;
@@ -519,16 +528,23 @@ int main(int argc, char **argv)
             delete uZonalSrc;
             delete uMeridionalSrc;
         }
+        
+        stop_timer(0, &secs, &nsecs);
+        printf("Time to remap and write w : %i.%9.9i\n", secs, nsecs);
 
 
 		//
 		// Interpolate scalar fields
 		//
+        
+        start_timer(0);
+        
         printf("Remapping other scalars\n");
         thetaSrc = new NCField<float>(globalFieldFile, "theta");
         thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
         thetaDst->remapFrom(*thetaSrc, *cellLayerMap);
         stat = thetaDst->defineInFile(ncid);
+        printf("Writing theta");
         stat = thetaDst->writeToFile(ncid);
         delete thetaSrc;
         delete thetaDst;
@@ -537,6 +553,7 @@ int main(int argc, char **argv)
         rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
         rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
         stat = rhoDst->defineInFile(ncid);
+        printf("Writing rho");
         stat = rhoDst->writeToFile(ncid);
         delete rhoSrc;
         delete rhoDst;
@@ -545,6 +562,7 @@ int main(int argc, char **argv)
         wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevelsP1", zgridDst->dimSize("nVertLevelsP1"));
         wDst->remapFrom(*wSrc, *cellLevelMap);
         stat = wDst->defineInFile(ncid);
+        printf("Writing w");
         stat = wDst->writeToFile(ncid);
         delete wSrc;
         delete wDst;
@@ -553,29 +571,14 @@ int main(int argc, char **argv)
         presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"));
 		presDst->remapFrom(*presSrc, *cellLayerMap);
         stat = presDst->defineInFile(ncid);
+        printf("Writing surface_pressure");
         stat = presDst->writeToFile(ncid);
         delete presSrc;
         delete presDst;
         
 		stop_timer(0, &secs, &nsecs);
-		printf("Time to remap fields : %i.%9.9i\n", secs, nsecs);
-
-
-		//
-		// Write interpolated target mesh fields to output file
-		//
-		start_timer(0);
-        stat = xtime->defineInFile(ncid);
-		stat = xtime->writeToFile(ncid);
-        delete xtime;
-
-        stat = nc_enddef(ncid);
-
-		stat = uDst->writeToFile(ncid);
-		stop_timer(0, &secs, &nsecs);
-
-		printf("Time to write output fields : %i.%9.9i\n", secs, nsecs);
-
+		printf("Time to remap and write other fields : %i.%9.9i\n", secs, nsecs);
+        
 		stat = nc_close(ncid);
 
 	}
