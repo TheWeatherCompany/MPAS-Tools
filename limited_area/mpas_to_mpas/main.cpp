@@ -458,42 +458,61 @@ int main(int argc, char **argv)
 		//
 		// Set up name of target mesh output file as interpolated.yyyy-mm-dd_hh.nc
 		//
+        start_timer(0);
 		xtimeArr = xtime->ptr2D();
 		snprintf(date, (size_t)20, "%s", xtimeArr[0]);
 		snprintf(targetFieldFile, (size_t)64, "interpolated.%s.nc", date);
-
 
 		//
 		// Create output file and define fields in it
 		//
 		stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
+        size_t nCells = zmidDst->dimSize("nCells");
+        size_t nVertLevels = zmidDst->dimSize("nVertLevels");
+        bool scalars_found[NUM_SCALARS];
+        for (int i=0; i<NUM_SCALARS; i++) {
+            try {
+                qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
+                std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
+                snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
+                qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+                stat = qxDst[i]->defineInFile(ncid);
+                scalars_found[i] = true;
+            }catch (int e) {
+                std::cout << qxNames[i] << " not found in " << globalFieldFile << std::endl;
+                qxDst[i] = new NCField<float>();
+                scalars_found[i] = false;
+            }
+        }
         stat = xtime->defineInFile(ncid);
+        stat = uDst->defineInFile(ncid);
+        thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+        stat = thetaDst->defineInFile(ncid);
+        rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+        stat = rhoDst->defineInFile(ncid);
+        wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevelsP1", nVertLevels+1);
+        stat = wDst->defineInFile(ncid);
+        presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = presDst->defineInFile(ncid);
+        stat = nc_enddef(ncid);
+        
         stat = xtime->writeToFile(ncid);
         delete xtime;
+        
+        stop_timer(0, &secs, &nsecs);
+        printf("Completed file definition : %i.%9.9i\n", secs, nsecs);
 
 		//
 		// Look for scalars to process (qv, qc, qr, etc.)
 		//
         start_timer(0);
 		for (int i=0; i<NUM_SCALARS; i++) {
-			try {
-				qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
-				std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
-				snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
-				qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-				qxDst[i]->remapFrom(*qxSrc[i], *cellLayerMap);
-				stat = qxDst[i]->defineInFile(ncid);
-				delete qxSrc[i];
-			}
-			catch (int e) {
-				std::cout << qxNames[i] << " not found in " << globalFieldFile << std::endl;
-				qxDst[i] = new NCField<float>();
-			}
-            
-            if (qxDst[i]->valid()) {
+            if (scalars_found[i]) {
+                qxDst[i]->remapFrom(*qxSrc[i], *cellLayerMap);
                 stat = qxDst[i]->writeToFile(ncid);
+                delete qxSrc[i];
+                delete qxDst[i];
             }
-            delete(qxDst[i]);
 		}
         
         stop_timer(0, &secs, &nsecs);
@@ -516,10 +535,7 @@ int main(int argc, char **argv)
 			vDst->remapFrom(*vSrc, *cellToEdgeMap);
 		}
 		rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
-        
-        stat = uDst->defineInFile(ncid);
         stat = uDst->writeToFile(ncid);
-        
         delete uSrc;
         delete vSrc;
         delete uDst;
@@ -541,37 +557,29 @@ int main(int argc, char **argv)
         
         printf("Remapping other scalars\n");
         thetaSrc = new NCField<float>(globalFieldFile, "theta");
-        thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
         thetaDst->remapFrom(*thetaSrc, *cellLayerMap);
-        stat = thetaDst->defineInFile(ncid);
-        printf("Writing theta");
+        printf("Writing theta\n");
         stat = thetaDst->writeToFile(ncid);
         delete thetaSrc;
         delete thetaDst;
         
         rhoSrc = new NCField<float>(globalFieldFile, "rho");
-        rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
         rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
-        stat = rhoDst->defineInFile(ncid);
-        printf("Writing rho");
+        printf("Writing rho\n");
         stat = rhoDst->writeToFile(ncid);
         delete rhoSrc;
         delete rhoDst;
         
         wSrc = new NCField<float>(globalFieldFile, "w");
-        wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"), "nVertLevelsP1", zgridDst->dimSize("nVertLevelsP1"));
         wDst->remapFrom(*wSrc, *cellLevelMap);
-        stat = wDst->defineInFile(ncid);
-        printf("Writing w");
+        printf("Writing w\n");
         stat = wDst->writeToFile(ncid);
         delete wSrc;
         delete wDst;
         
         presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
-        presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", zmidDst->dimSize("nCells"));
 		presDst->remapFrom(*presSrc, *cellLayerMap);
-        stat = presDst->defineInFile(ncid);
-        printf("Writing surface_pressure");
+        printf("Writing surface_pressure\n");
         stat = presDst->writeToFile(ncid);
         delete presSrc;
         delete presDst;

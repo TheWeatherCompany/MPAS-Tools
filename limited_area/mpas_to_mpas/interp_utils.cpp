@@ -153,7 +153,7 @@ float mpas_triangle_signed_area_sphere(float *a, float *b, float *c, float radiu
 	float ab, bc, ca, semiperim, tanqe;
 	float ablen[3], aclen[3], Dlen[3];
 
-	float mpas_triangle_signed_area_sphere;
+	float area;
  
 	ab = mpas_arc_length(a[0], a[1], a[2], b[0], b[1], b[2]) / radius;
 	bc = mpas_arc_length(b[0], b[1], b[2], c[0], c[1], c[2]) / radius;
@@ -162,7 +162,7 @@ float mpas_triangle_signed_area_sphere(float *a, float *b, float *c, float radiu
  
 	tanqe = sqrtf(max(0.0,tanf(0.5 * semiperim) * tanf(0.5 * (semiperim - ab)) * tanf(0.5 * (semiperim - bc)) * tanf(0.5 * (semiperim - ca))));
  
-	mpas_triangle_signed_area_sphere = 4.0 * radius * radius * atanf(tanqe);
+	area = 4.0 * radius * radius * atanf(tanqe);
  
 	// computing correct signs (in similar fashion to mpas_sphere_angle)
 	ablen[0] = b[0] - a[0];
@@ -178,10 +178,10 @@ float mpas_triangle_signed_area_sphere(float *a, float *b, float *c, float radiu
 	Dlen[2] =   (ablen[0] * aclen[1]) - (ablen[1] * aclen[0]);
  
 	if ((Dlen[0]*a[0] + Dlen[1]*a[1] + Dlen[2]*a[2]) < 0.0) {
-		mpas_triangle_signed_area_sphere = -1.0 * mpas_triangle_signed_area_sphere;
+		area = -1.0 * area;
 	}
  
-	return mpas_triangle_signed_area_sphere;
+	return area;
 }
 
 

@@ -102,7 +102,7 @@ public:
 		else if (std::is_same<char, fieldType>::value) {
 			xtype = NC_CHAR;
 		}
-		data = new fieldType[totsize];
+        data = NULL; // defer data allocation till requested
 		data2d = NULL;
 		data3d = NULL;
 		isValid = true;
@@ -314,42 +314,38 @@ public:
 
 	fieldType * ptr1D()
 	{
-		if (data) {
-			return data;
-		}
-		else {
-			return NULL;
-		}
+        if (data == NULL) {
+            data = new fieldType[totsize];
+        }
+        return data;
 	}
 
 
 	fieldType ** ptr2D()
 	{
-		if (data2d) {
-			return data2d;
+        if (data == NULL) {
+            data = new fieldType[totsize];
+        }
+        
+		if (data2d == NULL && ndims == 2) {
+            data2d = allocate_2d<fieldType>(dimlens[0], dimlens[1], data);
 		}
-		else if (data && ndims == 2) {
-			data2d = allocate_2d<fieldType>(dimlens[0], dimlens[1], data);
-			return data2d;
-		}
-		else {
-			return NULL;
-		}
+        
+        return data2d;
 	}
 
 
 	fieldType *** ptr3D()
 	{
-		if (data3d) {
-			return data3d;
-		}
-		else if (data && ndims == 3) {
-			data3d = allocate_3d<fieldType>(dimlens[0], dimlens[1], dimlens[2], data);
-			return data3d;
-		}
-		else {
-			return NULL;
-		}
+        if (data == NULL) {
+            data = new fieldType[totsize];
+        }
+        
+        if (data3d == NULL && ndims == 3) {
+            data3d = allocate_3d<fieldType>(dimlens[0], dimlens[1], dimlens[2], data);
+        }
+        
+        return data3d;
 	}
 
 
