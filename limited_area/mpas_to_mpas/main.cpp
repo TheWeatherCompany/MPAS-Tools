@@ -38,7 +38,6 @@ int main(int argc, char **argv)
 	float ***vDstArr;
 	float **zgridDstArr;
 	float **zmidDstArr;
-	float ***rhoDstArr;
 	float *angleEdgeDstArr;
 
 	char qxLbcName[64];
@@ -77,7 +76,6 @@ int main(int argc, char **argv)
 	NCField<float> *qxSrc[NUM_SCALARS];
 	float **zgridSrcArr;
 	float **zmidSrcArr;
-	float ***rhoSrcArr;
 	RemapperCell *cellLayerMap;
 	RemapperCell *cellLevelMap;
 	RemapperCell *cellToEdgeMap;
@@ -383,6 +381,24 @@ int main(int argc, char **argv)
         printf("Total Time to create edgeMap : %i.%9.9i\n", tsecs, tnsecs);
 	}
 
+    delete xCellDst, yCellDst, zCellDst;
+    delete xEdgeDst, yEdgeDst, zEdgeDst;
+    delete xCellSrc, yCellSrc, zCellSrc;
+    delete xEdgeSrc, yEdgeSrc, zEdgeSrc;
+    delete xVertexSrc, yVertexSrc, zVertexSrc;
+    delete zgridDst;
+    delete cellsOnEdgeDst, edgesOnCellSrc;
+    delete cellsOnCellSrc;
+    delete verticesOnCellSrc, cellsOnVertexSrc;
+    delete cellsOnEdgeSrc;
+    delete zmidSrc;
+        delete zgridSrc;
+        delete zedgeSrc, zedgeDst;
+
+        size_t nCells = zmidDst->dimSize("nCells");
+        size_t nVertLevels = zmidDst->dimSize("nVertLevels");
+
+	delete zmidDst;
 
 	//
 	// Time-dependent processing for all global input times
@@ -431,8 +447,8 @@ int main(int argc, char **argv)
 		//
 		// Allocate fields for interpolated target mesh fields
 		//
-		uDst = new NCField<float>("u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
-		vDst = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", zmidDst->dimSize("nVertLevels"));
+		uDst = new NCField<float>("u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", nVertLevels);
+		vDst = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", nVertLevels);
 
 		//
 		// Reconstruct the global v field, and rotate the {u,v} vector field so that
@@ -451,18 +467,17 @@ int main(int argc, char **argv)
             stop_timer(0, &secs, &nsecs);
             printf("Time to reconstruct v and rotate winds : %i.%9.9i\n", secs, nsecs);
 		}
-		rhoSrcArr = rhoSrc->ptr3D();
-		rhoDstArr = rhoDst->ptr3D();
         
         // Reading scalars
         start_timer(0);
-        size_t nCells = zmidDst->dimSize("nCells");
-        size_t nVertLevels = zmidDst->dimSize("nVertLevels");
         bool scalars_found[NUM_SCALARS];
-#pragma omp parallel for
+        stat = nc_open(globalFieldFile, NC_SHARE, &ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
         for (int i=0; i<NUM_SCALARS; i++) {
             try {
-                qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
+                qxSrc[i] = new NCField<float>(ncid, qxNames[i]);
                 std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
                 snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
                 qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
@@ -472,6 +487,10 @@ int main(int argc, char **argv)
                 qxDst[i] = new NCField<float>();
                 scalars_found[i] = false;
             }
+        }
+        stat = nc_close(ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
         }
         stop_timer(0, &secs, &nsecs);
         printf("Finished reading scalars : %i.%9.9i\n", secs, nsecs);
@@ -533,9 +552,6 @@ int main(int argc, char **argv)
 		//
 		// Interpolate the zonal and meridional winds, and rotate the wind vector field so that u is the normal component
 		//
-		uDstArr = uDst->ptr3D();
-		vDstArr = vDst->ptr3D();
-		angleEdgeDstArr = angleEdgeDst->ptr1D();
 		if (!use_reconstruct_winds) {
 			uDst->remapFrom(*uSrc, *edgeMap);
 			vDst->remapFrom(*vSrc, *edgeMap);
@@ -544,6 +560,9 @@ int main(int argc, char **argv)
 			uDst->remapFrom(*uSrc, *cellToEdgeMap);
 			vDst->remapFrom(*vSrc, *cellToEdgeMap);
 		}
+                uDstArr = uDst->ptr3D();
+                vDstArr = vDst->ptr3D();
+                angleEdgeDstArr = angleEdgeDst->ptr1D();
 		rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
         stat = uDst->writeToFile(ncid);
         delete uSrc;
@@ -602,25 +621,8 @@ int main(int argc, char **argv)
 	}
 	
 
-	delete cellsOnEdgeDst;
-    delete xCellDst, yCellDst, zCellDst;
-    delete xEdgeDst, yEdgeDst, zEdgeDst;
 	delete angleEdgeDst;
-	delete zgridDst;
-	delete zedgeDst;
-	delete zmidDst;
-    delete xCellSrc, yCellSrc, zCellSrc;
-    delete xEdgeSrc, yEdgeSrc, zEdgeSrc;
-    delete xVertexSrc, yVertexSrc, zVertexSrc;
 	delete nEdgesOnCellSrc;
-	delete cellsOnCellSrc;
-	delete verticesOnCellSrc;
-	delete cellsOnVertexSrc;
-	delete cellsOnEdgeSrc;
-	delete edgesOnCellSrc;
-	delete zgridSrc;
-	delete zedgeSrc;
-	delete zmidSrc;
 	delete cellLayerMap;
 	delete cellLevelMap;
 	if (!use_reconstruct_winds) {

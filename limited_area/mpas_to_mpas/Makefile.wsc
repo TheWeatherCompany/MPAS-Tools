@@ -4,7 +4,7 @@ OBJS = main.o timer_newer.o RemapperBase.o RemapperCell.o RemapperEdge.o NCField
 
 CXX = mpicxx -std=c++11 -mp -O3
 CXXFLAGS = -I${NETCDF}/include
-LDFLAGS = -L${NETCDF}/lib -lnetcdf -lnetcdff -lhdf5_hl -lhdf5 -lz -lpnetcdf
+LDFLAGS = -L${NETCDF}/lib -lnetcdf -lnetcdff -lhdf5_hl -lhdf5 -lz # -lpnetcdf
 
 all: $(OBJS)
 	$(CXX) $(CXXFLAGS) $(OBJS) $(LDFLAGS) -lrt
