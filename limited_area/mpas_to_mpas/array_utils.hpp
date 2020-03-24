@@ -1,9 +1,9 @@
 #ifndef _ARRAY_UTILS_H
 #define _ARRAY_UTILS_H
 template <class T>
-T ** allocate_2d(int dim1, int dim2, T *src)
+T ** allocate_2d(size_t dim1, size_t dim2, T *src)
 {
-	int i;
+	size_t i;
 	T **arr;
 
 	arr = (T **)malloc(sizeof(T *) * (size_t)dim1);

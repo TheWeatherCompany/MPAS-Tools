@@ -14,7 +14,7 @@ void stop_timer(int n, int *secs, int *n_secs);
 int main(int argc, char **argv)
 {
 	int ncid;
-	int stat;
+        int stat;
 
 	const int NUM_SCALARS = 6;
 	char qxNames[NUM_SCALARS][3] = {"qv", "qc", "qr", "qi", "qs", "qg"};
@@ -133,7 +133,7 @@ int main(int argc, char **argv)
             throw stat;
         }
         
-		xCellDst = new NCField<float>(ncid, "xCell");
+	xCellDst = new NCField<float>(ncid, "xCell");
         yCellDst = new NCField<float>(ncid, "yCell");
         zCellDst = new NCField<float>(ncid, "zCell");
         xEdgeDst = new NCField<float>(ncid, "xEdge");
@@ -155,21 +155,28 @@ int main(int argc, char **argv)
         }
         
         // normalize
+        float *xArr, *yArr, *zArr;
         size_t nCells = static_cast<size_t>(xCellDst->dimSize("nCells"));
+        xArr = xCellDst->ptr1D();
+        yArr = yCellDst->ptr1D();
+        zArr = zCellDst->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nCells; i++) {
-            xCellDst[i] /= sphere_radius;
-            yCellDst[i] /= sphere_radius;
-            zCellDst[i] /= sphere_radius;
+            xArr[i] = xArr[i]/sphere_radius;
+            yArr[i] = yArr[i]/sphere_radius;
+            zArr[i] = zArr[i]/sphere_radius;
         }
-        size_t nEdges = static_cast<size_t)(xEdgeDst->dimSize("nEdges"));
+        size_t nEdges = static_cast<size_t>(xEdgeDst->dimSize("nEdges"));
+        xArr = xEdgeDst->ptr1D();
+        yArr = yEdgeDst->ptr1D();
+        zArr = zEdgeDst->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nEdges; i++) {
-            xEdgeDst[i] /= sphere_radius;
-            yEdgeDst[i] /= sphere_radius;
-            zEdgeDst[i] /= sphere_radius;
-        }
+            xArr[i] = xArr[i]/sphere_radius;
+            yArr[i] = yArr[i]/sphere_radius;
+            zArr[i] = zArr[i]/sphere_radius;
 	}
+        }
 	catch (int e) {
 		std::cerr << "Error reading target fields from " << targetMeshFile << std::endl;
 		return 1;
@@ -184,12 +191,12 @@ int main(int argc, char **argv)
 	start_timer(0);
 	try {
         int stat, ncid;
-        stat = nc_open(targetMeshFile, NC_SHARE, &ncid);
+        stat = nc_open(globalMeshFile, NC_SHARE, &ncid);
         if (stat != NC_NOERR) {
             throw stat;
         }
-        
-		xCellSrc = new NCField<float>(ncid, "xCell");
+
+        xCellSrc = new NCField<float>(ncid, "xCell");
         yCellSrc = new NCField<float>(ncid, "yCell");
         zCellSrc = new NCField<float>(ncid, "zCell");
         xEdgeSrc = new NCField<float>(ncid, "xEdge");
@@ -199,17 +206,19 @@ int main(int argc, char **argv)
         yVertexSrc = new NCField<float>(ncid, "yVertex");
         zVertexSrc = new NCField<float>(ncid, "zVertex");
         nEdgesOnCellSrc = new NCField<int>(ncid, "nEdgesOnCell");
+    if (!use_reconstruct_winds) {
         nEdgesOnEdgeSrc = new NCField<int>(ncid, "nEdgesOnEdge");
         weightsOnEdgeSrc = new NCField<float>(ncid, "weightsOnEdge");
         edgesOnEdgeSrc = new NCField<int>(ncid, "edgesOnEdge");
         angleEdgeSrc = new NCField<float>(ncid, "angleEdge");
+    }
         cellsOnCellSrc = new NCField<int>(ncid, "cellsOnCell");
         verticesOnCellSrc = new NCField<int>(ncid, "verticesOnCell");
         cellsOnVertexSrc = new NCField<int>(ncid, "cellsOnVertex");
         cellsOnEdgeSrc = new NCField<int>(ncid, "cellsOnEdge");
         edgesOnCellSrc = new NCField<int>(ncid, "edgesOnCell");
         zgridSrc = new NCField<float>(ncid, "zgrid");
-        
+ 
         float sphere_radius;
         stat = nc_get_att_float (ncid, NC_GLOBAL, "sphere_radius", &sphere_radius);
         if (stat != NC_NOERR) {
@@ -222,27 +231,37 @@ int main(int argc, char **argv)
         }
         
         // normalize
+        float *xArr, *yArr, *zArr;
         size_t nCells = static_cast<size_t>(xCellSrc->dimSize("nCells"));
+        xArr = xCellSrc->ptr1D();
+        yArr = yCellSrc->ptr1D();
+        zArr = zCellSrc->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nCells; i++) {
-            xCellSrc[i] /= sphere_radius;
-            yCellSrc[i] /= sphere_radius;
-            zCellSrc[i] /= sphere_radius;
+            xArr[i] = xArr[i]/sphere_radius;
+            yArr[i] = yArr[i]/sphere_radius;
+            zArr[i] = zArr[i]/sphere_radius;
         }
-        size_t nEdges = static_cast<size_t)(xEdgeSrc->dimSize("nEdges"));
+        size_t nEdges = static_cast<size_t>(xEdgeSrc->dimSize("nEdges"));
+        xArr = xEdgeSrc->ptr1D();
+        yArr = yEdgeSrc->ptr1D();
+        zArr = zEdgeSrc->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nEdges; i++) {
-            xEdgeSrc[i] /= sphere_radius;
-            yEdgeSrc[i] /= sphere_radius;
-            zEdgeSrc[i] /= sphere_radius;
+            xArr[i] = xArr[i]/sphere_radius;
+            yArr[i] = yArr[i]/sphere_radius;
+            zArr[i] = zArr[i]/sphere_radius;
         }
-        size_t nVertices = static_cast<size_t)(xVertexSrc->dimSize("nVertices"));
+        size_t nVertices = static_cast<size_t>(xVertexSrc->dimSize("nVertices"));
+        xArr = xVertexSrc->ptr1D();
+        yArr = yVertexSrc->ptr1D();
+        zArr = zVertexSrc->ptr1D();
 #pragma omp parallel for simd
-        for (size_t i=0; i<nEdges; i++) {
-            xVertexSrc[i] /= sphere_radius;
-            yVertexSrc[i] /= sphere_radius;
-            zVertexSrc[i] /= sphere_radius;
-        }
+        for (size_t i=0; i<nVertices; i++) {
+            xArr[i] = xArr[i]/sphere_radius;
+            yArr[i] = yArr[i]/sphere_radius;
+            zArr[i] = zArr[i]/sphere_radius;
+	}
 	}
 	catch (int e) {
 		std::cerr << "Error reading global mesh fields from " << globalMeshFile << std::endl;
@@ -261,7 +280,6 @@ int main(int argc, char **argv)
 	zmidDst = new NCField<float>("zmid", 2, "nCells", zgridDst->dimSize("nCells"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
 	zedgeDst = new NCField<float>("zedge", 2, "nEdges", xEdgeDst->dimSize("nEdges"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
 
-
 	//
 	// Average global grid zgrid field to layer midpoints and then to edges
 	//
@@ -273,10 +291,10 @@ int main(int argc, char **argv)
 	stop_timer(0, &secs, &nsecs);
 	printf("Time to average zgridSrc to edges: %i.%9.9i\n", secs, nsecs);
 
-
 	//
 	// Average target grid zgrid field to layer midpoints and then to edges
 	//
+        int ** cov = cellsOnVertexSrc->ptr2D();
 	start_timer(0);
 	zmidDstArr = zmidDst->ptr2D();
 	zgridDstArr = zgridDst->ptr2D();
