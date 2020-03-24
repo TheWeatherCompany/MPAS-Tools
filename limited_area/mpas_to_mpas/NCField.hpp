@@ -234,8 +234,7 @@ public:
 		int stat;
 		int dimids[MAXDIMS];
 
-        stat = nc_redef(ncid);
-		for (int i=0; i<ndims; i++) {
+        for (int i=0; i<ndims; i++) {
 			stat = nc_inq_dimid(ncid, dimnames[i], &dimids[i]);
 			if (stat != NC_NOERR) {
 				if (i != unlimited_dim) {
@@ -251,7 +250,6 @@ public:
 		if (stat != NC_NOERR) {
 			stat = nc_def_var(ncid, varname, xtype, ndims, dimids, &varid);
 		}
-        stat = nc_enddef(ncid);
 
 		return stat;
 	}

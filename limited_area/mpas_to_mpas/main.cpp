@@ -453,6 +453,28 @@ int main(int argc, char **argv)
 		}
 		rhoSrcArr = rhoSrc->ptr3D();
 		rhoDstArr = rhoDst->ptr3D();
+        
+        // Reading scalars
+        start_timer(0);
+        size_t nCells = zmidDst->dimSize("nCells");
+        size_t nVertLevels = zmidDst->dimSize("nVertLevels");
+        bool scalars_found[NUM_SCALARS];
+#pragma omp parallel for
+        for (int i=0; i<NUM_SCALARS; i++) {
+            try {
+                qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
+                std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
+                snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
+                qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+                scalars_found[i] = true;
+            }catch (int e) {
+                std::cout << qxNames[i] << " not found in " << globalFieldFile << std::endl;
+                qxDst[i] = new NCField<float>();
+                scalars_found[i] = false;
+            }
+        }
+        stop_timer(0, &secs, &nsecs);
+        printf("Finished reading scalars : %i.%9.9i\n", secs, nsecs);
 
 
 		//
@@ -467,21 +489,9 @@ int main(int argc, char **argv)
 		// Create output file and define fields in it
 		//
 		stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
-        size_t nCells = zmidDst->dimSize("nCells");
-        size_t nVertLevels = zmidDst->dimSize("nVertLevels");
-        bool scalars_found[NUM_SCALARS];
         for (int i=0; i<NUM_SCALARS; i++) {
-            try {
-                qxSrc[i] = new NCField<float>(globalFieldFile, qxNames[i]);
-                std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
-                snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
-                qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+            if (scalars_found[i]) {
                 stat = qxDst[i]->defineInFile(ncid);
-                scalars_found[i] = true;
-            }catch (int e) {
-                std::cout << qxNames[i] << " not found in " << globalFieldFile << std::endl;
-                qxDst[i] = new NCField<float>();
-                scalars_found[i] = false;
             }
         }
         stat = xtime->defineInFile(ncid);
