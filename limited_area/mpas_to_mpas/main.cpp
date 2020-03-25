@@ -550,11 +550,15 @@ int main(int argc, char **argv)
         if (!use_reconstruct_winds) {
             uDst->remapFrom(*uSrc, *edgeMap);
             vDst->remapFrom(*vSrc, *edgeMap);
+            delete uSrc;
+            delete vSrc;
         } else {
             uSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
-            vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
             uDst->remapFrom(*uSrc, *cellToEdgeMap);
+            delete uSrc;
+            vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
             vDst->remapFrom(*vSrc, *cellToEdgeMap);
+            delete vSrc;
         }
         float *** uDstArr = uDst->ptr3D();
         float *** vDstArr = vDst->ptr3D();
@@ -562,8 +566,6 @@ int main(int argc, char **argv)
         rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
         stat = uDst->writeToFile(ncid);
         if (stat != NC_NOERR) throw stat;
-        delete uSrc;
-        delete vSrc;
         delete uDst;
         delete vDst;
         

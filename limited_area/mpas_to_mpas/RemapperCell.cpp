@@ -9,8 +9,8 @@
 #define HSrcPts2d(i,j) HSrcPts[(i)*maxHSrcPts+(j)]
 #define HSrcWghts2d(i,j) HSrcWghts[(i)*maxHSrcPts+(j)]
 #define nVSrcPts2d(i,j) nVSrcPts[(i)*nVDstPts+(j)]
-#deinfe VSrcPts3d(i,j,k) VSrcPts[(i)*nVDstPts*maxVSrcPts+(j)*maxVSrcPts+(k)]
-#deinfe VSrcWghts3d(i,j,k) VSrcWghts[(i)*nVDstPts*maxVSrcPts+(j)*maxVSrcPts+(k)]
+#define VSrcPts3d(i,j,k) VSrcPts[((i)*nVDstPts+(j))*maxVSrcPts+(k)]
+#define VSrcWghts3d(i,j,k) VSrcWghts[((i)*nVDstPts+(j))*maxVSrcPts+(k)]
 
 RemapperCell::RemapperCell()
 {
@@ -18,19 +18,14 @@ RemapperCell::RemapperCell()
 	maxHSrcPts = 0;
 	nHSrcPts = NULL;
 	HSrcPts = NULL;
-	HSrcPts2d = NULL;
 	HSrcWghts = NULL;
-	HSrcWghts2d = NULL;
 
 	nVDstPts = 0;
 	nVSrcLevels = 0;
 	maxVSrcPts = 0;
 	nVSrcPts = NULL;
-	nVSrcPts2d = NULL;
 	VSrcPts = NULL;
-	VSrcPts3d = NULL;
 	VSrcWghts = NULL;
-	VSrcWghts3d = NULL;
 }
 
 RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree)
@@ -47,7 +42,6 @@ RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst
     
     if (nVSrcLevels > 0 && nVDstPts > 0) {
         nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];
-        nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
         VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
         VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
     }
@@ -91,12 +85,12 @@ void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCell
         pointInterp[1] = yCellDst[i];
         pointInterp[2] = zCellDst[i];
         for (int iv=0; iv<maxHSrcPts; iv++) {
-            vertCoords[iv][0] = xCellSrc[HSrcPts2d[i][iv]];
-            vertCoords[iv][1] = yCellSrc[HSrcPts2d[i][iv]];
-            vertCoords[iv][2] = zCellSrc[HSrcPts2d[i][iv]];
+            vertCoords[iv][0] = xCellSrc[HSrcPts2d(i,iv)];
+            vertCoords[iv][1] = yCellSrc[HSrcPts2d(i,iv)];
+            vertCoords[iv][2] = zCellSrc[HSrcPts2d(i,iv)];
         }
 
-		mpas_wachspress_coordinates(maxHSrcPts, vertCoords, pointInterp, HSrcWghts2d[i]);
+		mpas_wachspress_coordinates(maxHSrcPts, vertCoords, pointInterp, HSrcWghts + (i*maxHSrcPts));
 
 		if (do3d) {
 			// Horizontally interpolate column of levelsSrc values
@@ -111,7 +105,10 @@ void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCell
 
 			// For each vertical destination point, determine weights from tempLevels
 			for (int k=0; k<nVDstPts; k++) {
-				get_weights_1d(nVSrcLevels, tempLevels, levelsDst[i][k], &nVSrcPts2d(i,k), &VSrcPts3d(i,k,0), &VSrcWghts3d(i,k,0));
+				get_weights_1d(nVSrcLevels, tempLevels, levelsDst[i][k],
+                                               nVSrcPts + (i*nVDstPts + k),
+                                               VSrcPts + ((i*nVDstPts+k)*maxVSrcPts),
+                                               VSrcWghts + ((i*nVDstPts+k)*maxVSrcPts));
 			}
 		}
 	}
@@ -175,7 +172,7 @@ void RemapperCell::remap3D(float ***dst, float ***src)
 
 	// TODO: Right now, the time dimension is the first dimension
 #pragma omp parallel for private(tempLevels) schedule(dynamic,1000)
-	for (int i=0; i<nHDstPts; i++) {
+	for (size_t i=0; i<nHDstPts; i++) {
 		// Horizontally interpolate column of levelsSrc values
 		for (int k=0; k<nVSrcLevels; k++) {
 			tempLevels[k] = 0;
@@ -187,9 +184,9 @@ void RemapperCell::remap3D(float ***dst, float ***src)
 		}
 
 		// For each vertical destination point, interpolate
-		for (int k=0; k<nVDstPts; k++) {
+		for (size_t k=0; k<nVDstPts; k++) {
 			dst[0][i][k] = 0;
-			for (int j=0; j<nVSrcPts2d(i,k); j++) {
+			for (size_t j=0; j<nVSrcPts2d(i,k); j++) {
 				dst[0][i][k] += VSrcWghts3d(i,k,j) * tempLevels[VSrcPts3d(i,k,j)];
 			}
 		}
