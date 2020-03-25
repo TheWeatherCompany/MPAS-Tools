@@ -34,11 +34,8 @@ int main(int argc, char **argv)
     NCField<float> *presDst;
     NCField<float> *qxDst[NUM_SCALARS];
     NCField<char> *xtime;
-    float ***uDstArr;
-    float ***vDstArr;
     float **zgridDstArr;
     float **zmidDstArr;
-    float *angleEdgeDstArr;
     
     char qxLbcName[64];
     
@@ -67,8 +64,6 @@ int main(int argc, char **argv)
     NCField<float> *zedgeSrc;
     NCField<float> *uSrc;
     NCField<float> *vSrc;
-    NCField<float> *uZonalSrc;
-    NCField<float> *uMeridionalSrc;
     float **zgridSrcArr;
     float **zmidSrcArr;
     RemapperCell *cellLayerMap;
@@ -415,16 +410,7 @@ int main(int argc, char **argv)
             return 1;
         }
         if (use_reconstruct_winds) {
-            try {
-                uSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
-            }
-            catch (int e) {
-                std::cerr << "Error reading uReconstructZonal field from " << globalFieldFile << std::endl;
-                return 1;
-            }
-            vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
-            uZonalSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
-            uMeridionalSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
+            // Defer reading uReconstructZonal/Meridional till needed
         }
         else {
             try {
@@ -557,24 +543,22 @@ int main(int argc, char **argv)
         stop_timer(0, &secs, &nsecs);
         printf("Time to remap and write scalars : %i.%9.9i\n", secs, nsecs);
         
-        start_timer(0);
-        
         //
         // Interpolate the zonal and meridional winds, and rotate the wind vector field so that u is the normal component
         //
+        start_timer(0);
         if (!use_reconstruct_winds) {
             uDst->remapFrom(*uSrc, *edgeMap);
             vDst->remapFrom(*vSrc, *edgeMap);
-            delete edgeMap;
-        }
-        else {
+        } else {
+            uSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
+            vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
             uDst->remapFrom(*uSrc, *cellToEdgeMap);
             vDst->remapFrom(*vSrc, *cellToEdgeMap);
-            delete cellToEdgeMap;
         }
-        uDstArr = uDst->ptr3D();
-        vDstArr = vDst->ptr3D();
-        angleEdgeDstArr = angleEdgeDst->ptr1D();
+        float *** uDstArr = uDst->ptr3D();
+        float *** vDstArr = vDst->ptr3D();
+        float * angleEdgeDstArr = angleEdgeDst->ptr1D();
         rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
         stat = uDst->writeToFile(ncid);
         if (stat != NC_NOERR) throw stat;
@@ -582,13 +566,9 @@ int main(int argc, char **argv)
         delete vSrc;
         delete uDst;
         delete vDst;
-        if (use_reconstruct_winds) {
-            delete uZonalSrc;
-            delete uMeridionalSrc;
-        }
         
         stop_timer(0, &secs, &nsecs);
-        printf("Time to remap and write w : %i.%9.9i\n", secs, nsecs);
+        printf("Time to remap and write winds : %i.%9.9i\n", secs, nsecs);
         
         
         //
@@ -637,7 +617,8 @@ int main(int argc, char **argv)
         
     }
     
-    
+    delete edgeMap;
+    delete cellToEdgeMap;
     delete angleEdgeDst;
     delete cellLayerMap;
     delete cellLevelMap;
