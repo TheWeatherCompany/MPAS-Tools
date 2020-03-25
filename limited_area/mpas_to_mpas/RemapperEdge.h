@@ -6,21 +6,22 @@
 class RemapperEdge : virtual public RemapperBase {
 public:
 	RemapperEdge();
+    RemapperEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst);
 	~RemapperEdge();
 	void remap(const std::type_info& t, int ndims, void *dst, void *src);
-	void computeWeightsEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst,
-                                  int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
-                                  float *latCellSrc, float *lonCellSrc,
-                                  float *latEdgeSrc, float *lonEdgeSrc,
-                                  float **levelsSrc,
-                                  float *latCellDst, float *lonCellDst,
-                                  float *latEdgeDst, float *lonEdgeDst,
-                                  float **levelsDst);
+	void computeWeightsEdge(int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
+                            float *xCellSrc, float *yCellSrc, float *zCellSrc,
+                            float *xEdgeSrc, float *yEdgeSrc, float *zEdgeSrc,
+                            float **levelsSrc,
+                            float *xCellDst, float *yCellDst, float *zCellDst,
+                            float *xEdgeDst, float *yEdgeDst, float *zEdgeDst,
+                            float **levelsDst);
 
 private:
 	//
 	// Horizontal remapping fields
 	//
+    int nCellSrcPts;
 	int nHDstPts;      // Number of horizontal destination points
 	int maxHSrcPts;    // Maximum number of horizontal source points needed by any destination point
 	int *nHSrcPts;     // Number of horizontal source points needed by any destination point

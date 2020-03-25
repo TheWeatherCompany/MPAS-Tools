@@ -27,6 +27,30 @@ RemapperCell::RemapperCell()
 	VSrcWghts3d = NULL;
 }
 
+RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree)
+{
+    nHDstPts = nCellsDst;
+    maxHSrcPts = vertexDegree;
+    nHSrcPts = new int[nHDstPts];   // set to all 1 for now...
+    HSrcPts = new int[(size_t)nHDstPts * (size_t)maxHSrcPts];
+    HSrcPts2d = allocate_2d<int>(nHDstPts, maxHSrcPts, HSrcPts);
+    HSrcWghts = new float[(size_t)nHDstPts * (size_t)maxHSrcPts];
+    HSrcWghts2d = allocate_2d<float>(nHDstPts, maxHSrcPts, HSrcWghts);
+    
+    nVDstPts = nVertLevelsDst;
+    nVSrcLevels = nVertLevelsSrc;
+    maxVSrcPts = 2;
+    
+    if (nVSrcLevels > 0 && nVDstPts > 0) {
+        nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];
+        nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
+        VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
+        VSrcPts3d = allocate_3d<int>(nHDstPts, nVDstPts, maxVSrcPts, VSrcPts);
+        VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
+        VSrcWghts3d = allocate_3d<float>(nHDstPts, nVDstPts, maxVSrcPts, VSrcWghts);
+    }
+}
+
 RemapperCell::~RemapperCell()
 {
 	if (nHSrcPts != NULL) delete[] nHSrcPts;
@@ -39,7 +63,6 @@ RemapperCell::~RemapperCell()
 	if (HSrcWghts2d != NULL) {
 		deallocate_2d<float>(HSrcWghts2d);
 	}
-
 
 	if (nVSrcPts != NULL) delete[] nVSrcPts;
 	if (VSrcPts != NULL) delete[] VSrcPts;
@@ -56,70 +79,54 @@ RemapperCell::~RemapperCell()
 	}
 }
 
-void RemapperCell::computeWeightsCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree,
-                                          int *nEdgesOnCellSrc, int **verticesOnCellSrc, int **cellsOnVertexSrc,
-                                          float *latCellSrc, float *lonCellSrc, float *latVertexSrc, float *lonVertexSrc, float **levelsSrc,
-                                          float *latCellDst, float *lonCellDst, float **levelsDst)
+void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCellSrc, int **cellsOnVertexSrc,
+                                      float *xCellSrc, float *yCellSrc, float *zCellSrc,
+                                      float *xVertexSrc, float *yVertexSrc, float *zVertexSrc, float **levelsSrc,
+                                      float *xCellDst, float *yCellDst, float *zCellDst, float **levelsDst)
 {
 	int j;
 	int nCells;
-	float tempLevels[nVertLevelsSrc];
-	float vertCoords[vertexDegree][3];
+	float tempLevels[nVSrcLevels];
+	float vertCoords[maxHSrcPts][3];
 	float pointInterp[3];
+    bool do3d = (nVSrcLevels > 0 && nVDstPts > 0);
 
-	nHDstPts = nCellsDst;
-	maxHSrcPts = vertexDegree;
-	nHSrcPts = new int[nHDstPts];   // set to all 1 for now...
-	HSrcPts = new int[(size_t)nHDstPts * (size_t)maxHSrcPts];
-	HSrcPts2d = allocate_2d<int>(nHDstPts, maxHSrcPts, HSrcPts);
-	HSrcWghts = new float[(size_t)nHDstPts * (size_t)maxHSrcPts];
-	HSrcWghts2d = allocate_2d<float>(nHDstPts, maxHSrcPts, HSrcWghts);
-
-	j = 0;
-#pragma omp parallel for firstprivate(j) private(pointInterp, vertCoords)
+	int jCell = 0;
+#pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
 	for (int i=0; i<nHDstPts; i++) {
-		nHSrcPts[i] = vertexDegree;
-		j = nearest_vertex(latCellDst[i], lonCellDst[i], j, vertexDegree,
-				   nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
-				   latCellSrc, lonCellSrc, latVertexSrc, lonVertexSrc);
-		HSrcPts2d[i][0] = cellsOnVertexSrc[j][0] - 1;
-		HSrcPts2d[i][1] = cellsOnVertexSrc[j][1] - 1;
-		HSrcPts2d[i][2] = cellsOnVertexSrc[j][2] - 1;
+		nHSrcPts[i] = maxHSrcPts;
+		jCell = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], jCell, maxHSrcPts,
+                           nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
+                           xCellSrc, yCellSrc, zCellSrc, xVertexSrc, yVertexSrc, zVertexSrc);
+		HSrcPts2d[i][0] = cellsOnVertexSrc[jCell][0] - 1;
+		HSrcPts2d[i][1] = cellsOnVertexSrc[jCell][1] - 1;
+		HSrcPts2d[i][2] = cellsOnVertexSrc[jCell][2] - 1;
+        
+        pointInterp[0] = xCellDst[i];
+        pointInterp[1] = yCellDst[i];
+        pointInterp[2] = zCellDst[i];
+        for (int iv=0; iv<maxHSrcPts; iv++) {
+            vertCoords[iv][0] = xCellSrc[HSrcPts2d[i][iv]];
+            vertCoords[iv][1] = yCellSrc[HSrcPts2d[i][iv]];
+            vertCoords[iv][2] = zCellSrc[HSrcPts2d[i][iv]];
+        }
 
-		convert_lx(&pointInterp[0], &pointInterp[1], &pointInterp[2], 6371229.0, latCellDst[i], lonCellDst[i]);
-		convert_lx(&vertCoords[0][0], &vertCoords[0][1], &vertCoords[0][2], 6371229.0, latCellSrc[HSrcPts2d[i][0]], lonCellSrc[HSrcPts2d[i][0]]);
-		convert_lx(&vertCoords[1][0], &vertCoords[1][1], &vertCoords[1][2], 6371229.0, latCellSrc[HSrcPts2d[i][1]], lonCellSrc[HSrcPts2d[i][1]]);
-		convert_lx(&vertCoords[2][0], &vertCoords[2][1], &vertCoords[2][2], 6371229.0, latCellSrc[HSrcPts2d[i][2]], lonCellSrc[HSrcPts2d[i][2]]);
+		mpas_wachspress_coordinates(maxHSrcPts, vertCoords, pointInterp, HSrcWghts2d[i]);
 
-		mpas_wachspress_coordinates(vertexDegree, vertCoords, pointInterp, HSrcWghts2d[i]);
-	}
-
-	if (nVertLevelsSrc > 0 && nVertLevelsDst > 0) {
-		nVDstPts = nVertLevelsDst;
-		nVSrcLevels = nVertLevelsSrc;
-		maxVSrcPts = 2;
-		nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];
-		nVSrcPts2d = allocate_2d<int>(nHDstPts, nVDstPts, nVSrcPts);
-		VSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
-		VSrcPts3d = allocate_3d<int>(nHDstPts, nVDstPts, maxVSrcPts, VSrcPts);
-		VSrcWghts = new float[(size_t)nHDstPts * (size_t)nVDstPts * (size_t)maxVSrcPts];
-		VSrcWghts3d = allocate_3d<float>(nHDstPts, nVDstPts, maxVSrcPts, VSrcWghts);
-
-#pragma omp parallel for private(tempLevels)
-		for (int i=0; i<nHDstPts; i++) {
+		if (do3d) {
 			// Horizontally interpolate column of levelsSrc values
-			for (int k=0; k<nVertLevelsSrc; k++) {
+			for (int k=0; k<nVSrcLevels; k++) {
 				tempLevels[k] = 0;
 			}
 			for (int j=0; j<nHSrcPts[i]; j++) {
-				for (int k=0; k<nVertLevelsSrc; k++) {
+				for (int k=0; k<nVSrcLevels; k++) {
 					tempLevels[k] += (HSrcWghts2d[i][j] * levelsSrc[HSrcPts2d[i][j]][k]);
 				}
 			}
 
 			// For each vertical destination point, determine weights from tempLevels
 			for (int k=0; k<nVDstPts; k++) {
-				get_weights_1d(nVertLevelsSrc, tempLevels, levelsDst[i][k], &nVSrcPts2d[i][k], VSrcPts3d[i][k], VSrcWghts3d[i][k]);
+				get_weights_1d(nVSrcLevels, tempLevels, levelsDst[i][k], &nVSrcPts2d[i][k], VSrcPts3d[i][k], VSrcWghts3d[i][k]);
 			}
 		}
 	}

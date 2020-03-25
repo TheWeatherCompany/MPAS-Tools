@@ -6,15 +6,15 @@
 class RemapperCell : virtual public RemapperBase {
 public:
 	RemapperCell();
+    RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree);
 	~RemapperCell();
 	void remap(const std::type_info& t, int ndims, void *dst, void *src);
-	void computeWeightsCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree, int *nEdgesOnCellSrc,
-                                  int **verticesOnCellSrc, int **cellsOnVertexSrc,
-                                  float *latCellSrc, float *lonCellSrc,
-                                  float *latVertexSrc, float *lonVertexSrc,
-                                  float **levelsSrc,
-                                  float *latCellDst, float *lonCellDst,
-                                  float **levelsDst);
+	void computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCellSrc, int **cellsOnVertexSrc,
+                            float *xCellSrc, float *yCellSrc, float *zCellSrc,
+                            float *xVertexSrc, float *yVertexSrc, float *zVertexSrc,
+                            float **levelsSrc,
+                            float *xCellDst, float *yCellDst, float *zCellDst,
+                            float **levelsDst);
 
 private:
 	//
