@@ -468,8 +468,7 @@ int main(int argc, char **argv)
             delete angleEdgeSrc;
         }
         
-        // Reading scalars
-        start_timer(0);
+        // Identifying which scalar qx's are available from src
         bool scalars_found[NUM_SCALARS];
         stat = nc_open(globalFieldFile, NC_SHARE, &ncid);
         if (stat != NC_NOERR) {
@@ -494,8 +493,6 @@ int main(int argc, char **argv)
         if (stat != NC_NOERR) {
             throw stat;
         }
-        stop_timer(0, &secs, &nsecs);
-        printf("Finished reading scalars : %i.%9.9i\n", secs, nsecs);
         
         
         //
@@ -528,6 +525,7 @@ int main(int argc, char **argv)
         stat = nc_enddef(ncid);
         
         stat = xtime->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
         delete xtime;
         
         stop_timer(0, &secs, &nsecs);
@@ -547,11 +545,12 @@ int main(int argc, char **argv)
                 NCField<float> * qxSrc = new NCField<float>(src_ncid, qxNames[i]);
                 qxDst[i]->remapFrom(*qxSrc, *cellLayerMap);
                 stat = qxDst[i]->writeToFile(ncid);
+                if (stat != NC_NOERR) throw stat;
                 delete qxSrc;
                 delete qxDst[i];
             }
         }
-        stat = nc_close(ncid);
+        stat = nc_close(src_ncid);
         if (stat != NC_NOERR) {
             throw stat;
         }
@@ -578,6 +577,7 @@ int main(int argc, char **argv)
         angleEdgeDstArr = angleEdgeDst->ptr1D();
         rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
         stat = uDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
         delete uSrc;
         delete vSrc;
         delete uDst;
@@ -602,6 +602,7 @@ int main(int argc, char **argv)
         thetaDst->remapFrom(*thetaSrc, *cellLayerMap);
         printf("Writing theta\n");
         stat = thetaDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
         delete thetaSrc;
         delete thetaDst;
         
@@ -609,6 +610,7 @@ int main(int argc, char **argv)
         rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
         printf("Writing rho\n");
         stat = rhoDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
         delete rhoSrc;
         delete rhoDst;
         
@@ -616,6 +618,7 @@ int main(int argc, char **argv)
         wDst->remapFrom(*wSrc, *cellLevelMap);
         printf("Writing w\n");
         stat = wDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
         delete wSrc;
         delete wDst;
         
@@ -623,6 +626,7 @@ int main(int argc, char **argv)
         presDst->remapFrom(*presSrc, *cellLayerMap);
         printf("Writing surface_pressure\n");
         stat = presDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
         delete presSrc;
         delete presDst;
         
