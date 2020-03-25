@@ -493,12 +493,12 @@ int main(int argc, char **argv)
         // Create output file and define fields in it
         //
         stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
+        stat = xtime->defineInFile(ncid);
         for (int i=0; i<NUM_SCALARS; i++) {
             if (scalars_found[i]) {
                 stat = qxDst[i]->defineInFile(ncid);
             }
         }
-        stat = xtime->defineInFile(ncid);
         stat = uDst->defineInFile(ncid);
         thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
         stat = thetaDst->defineInFile(ncid);
