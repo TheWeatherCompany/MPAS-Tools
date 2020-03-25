@@ -617,8 +617,11 @@ int main(int argc, char **argv)
         
     }
     
-    delete edgeMap;
-    delete cellToEdgeMap;
+    
+    if (use_reconstruct_winds)
+        delete cellToEdgeMap;
+    else
+        delete edgeMap;
     delete angleEdgeDst;
     delete cellLayerMap;
     delete cellLevelMap;
