@@ -67,13 +67,8 @@ int main(int argc, char **argv)
     NCField<float> *zedgeSrc;
     NCField<float> *uSrc;
     NCField<float> *vSrc;
-    NCField<float> *thetaSrc;
     NCField<float> *uZonalSrc;
     NCField<float> *uMeridionalSrc;
-    NCField<float> *rhoSrc;
-    NCField<float> *wSrc;
-    NCField<float> *presSrc;
-    NCField<float> *qxSrc[NUM_SCALARS];
     float **zgridSrcArr;
     float **zmidSrcArr;
     RemapperCell *cellLayerMap;
@@ -482,7 +477,9 @@ int main(int argc, char **argv)
         }
         for (int i=0; i<NUM_SCALARS; i++) {
             try {
-                qxSrc[i] = new NCField<float>(ncid, qxNames[i]);
+                int varid;
+                stat = nc_inq_varid(ncid, qxNames[i], &varid);
+                if (stat != NC_NOERR) throw stat;
                 std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
                 snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
                 qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
@@ -540,15 +537,24 @@ int main(int argc, char **argv)
         // Look for scalars to process (qv, qc, qr, etc.)
         //
         start_timer(0);
+        int src_ncid;
+        stat = nc_open(globalFieldFile, NC_SHARE, &src_ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
         for (int i=0; i<NUM_SCALARS; i++) {
             if (scalars_found[i]) {
-                qxDst[i]->remapFrom(*qxSrc[i], *cellLayerMap);
+                NCField<float> * qxSrc = new NCField<float>(src_ncid, qxNames[i]);
+                qxDst[i]->remapFrom(*qxSrc, *cellLayerMap);
                 stat = qxDst[i]->writeToFile(ncid);
-                delete qxSrc[i];
+                delete qxSrc;
                 delete qxDst[i];
             }
         }
-        
+        stat = nc_close(ncid);
+        if (stat != NC_NOERR) {
+            throw stat;
+        }
         stop_timer(0, &secs, &nsecs);
         printf("Time to remap and write scalars : %i.%9.9i\n", secs, nsecs);
         
@@ -565,6 +571,7 @@ int main(int argc, char **argv)
         else {
             uDst->remapFrom(*uSrc, *cellToEdgeMap);
             vDst->remapFrom(*vSrc, *cellToEdgeMap);
+            delete cellToEdgeMap;
         }
         uDstArr = uDst->ptr3D();
         vDstArr = vDst->ptr3D();
@@ -578,7 +585,6 @@ int main(int argc, char **argv)
         if (use_reconstruct_winds) {
             delete uZonalSrc;
             delete uMeridionalSrc;
-            delete cellToEdgeMap;
         }
         
         stop_timer(0, &secs, &nsecs);
@@ -592,28 +598,28 @@ int main(int argc, char **argv)
         start_timer(0);
         
         printf("Remapping other scalars\n");
-        thetaSrc = new NCField<float>(globalFieldFile, "theta");
+        NCField<float> * thetaSrc = new NCField<float>(globalFieldFile, "theta");
         thetaDst->remapFrom(*thetaSrc, *cellLayerMap);
         printf("Writing theta\n");
         stat = thetaDst->writeToFile(ncid);
         delete thetaSrc;
         delete thetaDst;
         
-        rhoSrc = new NCField<float>(globalFieldFile, "rho");
+        NCField<float> * rhoSrc = new NCField<float>(globalFieldFile, "rho");
         rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
         printf("Writing rho\n");
         stat = rhoDst->writeToFile(ncid);
         delete rhoSrc;
         delete rhoDst;
         
-        wSrc = new NCField<float>(globalFieldFile, "w");
+        NCField<float> * wSrc = new NCField<float>(globalFieldFile, "w");
         wDst->remapFrom(*wSrc, *cellLevelMap);
         printf("Writing w\n");
         stat = wDst->writeToFile(ncid);
         delete wSrc;
         delete wDst;
         
-        presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
+        NCField<float> * presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
         presDst->remapFrom(*presSrc, *cellLayerMap);
         printf("Writing surface_pressure\n");
         stat = presDst->writeToFile(ncid);
