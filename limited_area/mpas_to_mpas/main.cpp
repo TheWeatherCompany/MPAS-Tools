@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 #include "netcdf.h"
 #include "NCField.hpp"
@@ -70,7 +71,7 @@ int main(int argc, char **argv)
     RemapperCell *cellLevelMap;
     RemapperCell *cellToEdgeMap;
     RemapperEdge *edgeMap;
-    int secs, nsecs, tsecs, tnsecs;
+    int secs, nsecs;
     int itime;
     int argv_idx;
     int use_reconstruct_winds;
@@ -144,9 +145,10 @@ int main(int argc, char **argv)
         zArr = zCellDst->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nCells; i++) {
-            xArr[i] = xArr[i]/sphere_radius;
-            yArr[i] = yArr[i]/sphere_radius;
-            zArr[i] = zArr[i]/sphere_radius;
+            float r = sqrtf(xArr[i]*xArr[i] + yArr[i]*yArr[i] + zArr[i]*zArr[i]);
+            xArr[i] = xArr[i]/r;
+            yArr[i] = yArr[i]/r;
+            zArr[i] = zArr[i]/r;
         }
         size_t nEdges = static_cast<size_t>(xEdgeDst->dimSize("nEdges"));
         xArr = xEdgeDst->ptr1D();
@@ -154,9 +156,10 @@ int main(int argc, char **argv)
         zArr = zEdgeDst->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nEdges; i++) {
-            xArr[i] = xArr[i]/sphere_radius;
-            yArr[i] = yArr[i]/sphere_radius;
-            zArr[i] = zArr[i]/sphere_radius;
+            float r = sqrtf(xArr[i]*xArr[i] + yArr[i]*yArr[i] + zArr[i]*zArr[i]);
+            xArr[i] = xArr[i]/r;
+            yArr[i] = yArr[i]/r;
+            zArr[i] = zArr[i]/r;
         }
     }
     catch (int e) {
@@ -220,9 +223,10 @@ int main(int argc, char **argv)
         zArr = zCellSrc->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nCells; i++) {
-            xArr[i] = xArr[i]/sphere_radius;
-            yArr[i] = yArr[i]/sphere_radius;
-            zArr[i] = zArr[i]/sphere_radius;
+            float r = sqrtf(xArr[i]*xArr[i] + yArr[i]*yArr[i] + zArr[i]*zArr[i]);
+            xArr[i] = xArr[i]/r;
+            yArr[i] = yArr[i]/r;
+            zArr[i] = zArr[i]/r;
         }
         size_t nEdges = static_cast<size_t>(xEdgeSrc->dimSize("nEdges"));
         xArr = xEdgeSrc->ptr1D();
@@ -230,9 +234,10 @@ int main(int argc, char **argv)
         zArr = zEdgeSrc->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nEdges; i++) {
-            xArr[i] = xArr[i]/sphere_radius;
-            yArr[i] = yArr[i]/sphere_radius;
-            zArr[i] = zArr[i]/sphere_radius;
+            float r = sqrtf(xArr[i]*xArr[i] + yArr[i]*yArr[i] + zArr[i]*zArr[i]);
+            xArr[i] = xArr[i]/r;
+            yArr[i] = yArr[i]/r;
+            zArr[i] = zArr[i]/r;
         }
         size_t nVertices = static_cast<size_t>(xVertexSrc->dimSize("nVertices"));
         xArr = xVertexSrc->ptr1D();
@@ -240,9 +245,10 @@ int main(int argc, char **argv)
         zArr = zVertexSrc->ptr1D();
 #pragma omp parallel for simd
         for (size_t i=0; i<nVertices; i++) {
-            xArr[i] = xArr[i]/sphere_radius;
-            yArr[i] = yArr[i]/sphere_radius;
-            zArr[i] = zArr[i]/sphere_radius;
+            float r = sqrtf(xArr[i]*xArr[i] + yArr[i]*yArr[i] + zArr[i]*zArr[i]);
+            xArr[i] = xArr[i]/r;
+            yArr[i] = yArr[i]/r;
+            zArr[i] = zArr[i]/r;
         }
     }
     catch (int e) {
@@ -292,18 +298,12 @@ int main(int argc, char **argv)
     //
     start_timer(0);
     cellLevelMap = new RemapperCell(xCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3);
-    stop_timer(0, &secs, &nsecs);
-    printf("Time to allocate cellLevelMap : %i.%9.9i\n", secs, nsecs);
-    tsecs = secs; tnsecs = nsecs;
-    start_timer(0);
     cellLevelMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                      xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                      xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
                                      xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zgridDst->ptr2D());
     stop_timer(0, &secs, &nsecs);
     printf("Time to create cellLevelMap : %i.%9.9i\n", secs, nsecs);
-    tsecs += secs; tnsecs += nsecs;
-    printf("Total Time to create cellLevelMap : %i.%9.9i\n", tsecs, tnsecs);
     
     
     //
@@ -311,18 +311,12 @@ int main(int argc, char **argv)
     //
     start_timer(0);
     cellLayerMap = new RemapperCell(xCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3);
-    stop_timer(0, &secs, &nsecs);
-    printf("Time to allocate cellLayerMap : %i.%9.9i\n", secs, nsecs);
-    tsecs = secs; tnsecs = nsecs;
-    start_timer(0);
     cellLayerMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                      xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                      xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
                                      xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zmidDst->ptr2D());
     stop_timer(0, &secs, &nsecs);
     printf("Time to create cellLayerMap : %i.%9.9i\n", secs, nsecs);
-    tsecs += secs; tnsecs += nsecs;
-    printf("Total Time to create cellLayerMap : %i.%9.9i\n", tsecs, tnsecs);
     
     
     //
@@ -331,10 +325,6 @@ int main(int argc, char **argv)
     if (use_reconstruct_winds) {
         start_timer(0);
         cellToEdgeMap = new RemapperCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3);
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to allocate cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
-        tsecs = secs; tnsecs = nsecs;
-        start_timer(0);
         cellToEdgeMap->computeWeightsCell(nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
                                           xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                           xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
@@ -343,8 +333,6 @@ int main(int argc, char **argv)
         //    zedgeDst is the height field of the edges
         stop_timer(0, &secs, &nsecs);
         printf("Time to create cellToEdgeMap : %i.%9.9i\n", secs, nsecs);
-        tsecs += secs; tnsecs += nsecs;
-        printf("Total Time to create cellToEdgeMap : %i.%9.9i\n", tsecs, tnsecs);
     }
     
     
@@ -356,10 +344,6 @@ int main(int argc, char **argv)
         start_timer(0);
         edgeMap = new RemapperEdge(cellsOnCellSrc->dimSize("maxEdges"), xCellSrc->dimSize("nCells"), xEdgeDst->dimSize("nEdges"),
                                    zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"));
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to allocate edgeMap : %i.%9.9i\n", secs, nsecs);
-        tsecs = secs; tnsecs = nsecs;
-        start_timer(0);
         edgeMap->computeWeightsEdge(nEdgesOnCellSrc->ptr1D(), cellsOnCellSrc->ptr2D(), edgesOnCellSrc->ptr2D(),
                                     xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                     xEdgeSrc->ptr1D(), yEdgeSrc->ptr1D(), zEdgeSrc->ptr1D(), zedgeSrc->ptr2D(),
@@ -367,8 +351,6 @@ int main(int argc, char **argv)
                                     zEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), zedgeDst->ptr2D());
         stop_timer(0, &secs, &nsecs);
         printf("Time to create edgeMap : %i.%9.9i\n", secs, nsecs);
-        tsecs += secs; tnsecs += nsecs;
-        printf("Total Time to create edgeMap : %i.%9.9i\n", tsecs, tnsecs);
     }
     
     delete xCellDst, yCellDst, zCellDst;
@@ -492,7 +474,7 @@ int main(int argc, char **argv)
         //
         // Create output file and define fields in it
         //
-        stat = nc_create(targetFieldFile, NC_64BIT_DATA, &ncid);
+        stat = nc_create(targetFieldFile, NC_64BIT_DATA|NC_CLOBBER, &ncid);
         stat = xtime->defineInFile(ncid);
         for (int i=0; i<NUM_SCALARS; i++) {
             if (scalars_found[i]) {
