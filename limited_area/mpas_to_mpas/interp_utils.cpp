@@ -1,5 +1,6 @@
 #include <math.h>
 #include "interp_utils.h"
+#include <iostream>
 
 // Compute the great-circle distance between (lat1, lon1) and (lat2, lon2) on a
 // sphere with given radius.
@@ -121,12 +122,26 @@ int nearest_vertex(float target_x, float target_y, float target_z, int start_ver
 // same sphere centered at the origin.
 float mpas_arc_length(float ax, float ay, float az, float bx, float by, float bz)
 {
-    return acos(ax * bx + ay * by + az * bz);
+
+	float r, c;
+	float cx, cy, cz;
+
+	cx = bx - ax;
+	cy = by - ay;
+	cz = bz - az;
+
+	r = sqrtf(ax*ax + ay*ay + az*az);
+	c = sqrtf(cx*cx + cy*cy + cz*cz);
+	return 2.0 * r * asinf(c/(2.0*r));
 }
 
 float relative_distance(float ax, float ay, float az, float bx, float by, float bz)
 {
-    return -(ax * bx + ay * by + az * bz);
+    float cx, cy, cz;
+    cx = bx - ax;
+    cy = by - ay;
+    cz = bz - az;
+    return cx*cx + cy*cy + cz*cz;
 }
 
 
@@ -253,6 +268,7 @@ void mpas_wachspress_coordinates(int nVertices, float vertCoords[][3], float *po
 	// get summed weights for normalization
 	wach_total = 0.0;
 	for (int i=0; i<nVertices; i++) {
+                if (wach[i] < 0.0) wach[i] = 0.0;
 		wach_total = wach_total + wach[i];
 	}
 
