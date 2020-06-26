@@ -1,0 +1,14 @@
+pipeline {
+    environment {
+        SOURCE_DIR='/storage1dvs/home/dt_regression/workspace/mpas_repos_src'
+    }
+    agent any
+    stages {
+        stage('Make') {
+           steps {
+               sh 'pwd'
+               sh 'cd ${SOURCE_DIR}/GlobalNWP; pwd; source ./dtrc; cd ../MPAS-Tools; cd limited_area/mpas_to_mpas/; ./build_cray.sh'
+           }
+        }
+    }
+}

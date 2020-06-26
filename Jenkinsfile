@@ -7,7 +7,7 @@ pipeline {
         stage('Make') {
             steps {
                 sh 'pwd'
-                sh 'cd ${SOURCE_DIR}/GlobalNWP; pwd; source ./dtrc dyeus; cd ../MPAS-Tools; cd limited_area/mpas_to_mpas/; ./build_wsc.sh'
+                sh 'cd ${SOURCE_DIR}/GlobalNWP; pwd; source ./dtrc dyeus; cd ../MPAS-Tools; cd limited_area/mpas_to_mpas/; ./build_dyeus.sh'
             }
         }
     }
