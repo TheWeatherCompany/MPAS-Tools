@@ -78,7 +78,6 @@ void RemapperCell::computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **
                                       float *xCellDst, float *yCellDst, float *zCellDst, int *landmaskDst, 
                                       float **levelsDst)
 {
-	int nCells;
 	float tempLevels[nVSrcLevels];
 	float vertCoords[maxHSrcPts][3];
 	float pointInterp[3];
@@ -147,9 +146,6 @@ void RemapperCell::computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **
                     maxWghtSameLandmask = *(HSrcWghts + (i*maxHSrcPts) + j);
                 }
             }
-            if (i % 1000000 == 0) {
-                fprintf(stderr,"i: %d j: %d HSrcPts2d(i,j): %d\n",i,j,HSrcPts2d(i,j));
-            }
         }
 
         HSrcNearest[i] = maxWghtPt;
@@ -194,8 +190,6 @@ void RemapperCell::computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **
 
 void RemapperCell::remap(const std::type_info& t, int ndims, interp_type interp, void *dst, void *src)
 {
-    std::cout << "interp: " << interp << " barycentric: " << barycentric << std::endl;
-    std::cout << "ndims: " << ndims << std::endl;
 	if (std::type_index(t) == typeid(float)) {
 		if (ndims == 1) {
 			float *dstf = (float *)dst;
@@ -275,6 +269,7 @@ void RemapperCell::remap1D(float *dst, float *src)
 {
 	std::cerr << "Remapping 1d field\n";
 
+#pragma omp parallel for
 	for (int i=0; i<nHDstPts; i++) {
 		dst[i] = 0;
 		for (int j=0; j<nHSrcPts[i]; j++) {
@@ -288,6 +283,7 @@ void RemapperCell::remap1DNearest(float *dst, float *src, int *nearestMap)
 	std::cerr << "Remapping 1d field using nearest\n";
 
 	// TODO: Right now, the time dimension is the first dimension
+#pragma omp parallel for
     for (int i=0; i<nHDstPts; i++) {
         dst[i] = src[nearestMap[i]];
     }
@@ -298,6 +294,7 @@ void RemapperCell::remap2D(float **dst, float **src)
 	std::cerr << "Remapping 2d field\n";
 
 	// TODO: Right now, the time dimension is the first dimension
+#pragma omp parallel for
 	for (int i=0; i<nHDstPts; i++) {
 		dst[0][i] = 0;
 		for (int j=0; j<nHSrcPts[i]; j++) {
@@ -311,6 +308,7 @@ void RemapperCell::remap2DNearest(float **dst, float **src, int *nearestMap)
 	std::cerr << "Remapping 2d field using nearest\n";
 
 	// TODO: Right now, the time dimension is the first dimension
+#pragma omp parallel for
     for (int i=0; i<nHDstPts; i++) {
         dst[0][i] = src[0][nearestMap[i]];
     }
@@ -324,7 +322,7 @@ void RemapperCell::remap3D(float ***dst, float ***src)
 	float tempLevels[nVSrcLevels];
 
 	// TODO: Right now, the time dimension is the first dimension
-//#pragma omp parallel for private(tempLevels) schedule(dynamic,1000)
+#pragma omp parallel for private(tempLevels) schedule(dynamic,1000)
 	for (size_t i=0; i<nHDstPts; i++) {
 		// Horizontally interpolate column of levelsSrc values
 		for (int k=0; k<nVSrcLevels; k++) {

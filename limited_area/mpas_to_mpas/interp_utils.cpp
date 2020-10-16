@@ -54,7 +54,7 @@ int nearest_vertex(float target_x, float target_y, float target_z, int start_ver
                    float *xCell, float *yCell, float *zCell,
                    float *xVertex, float *yVertex, float *zVertex)
 {
-	int i, cell1, cell2, cell3, iCell, iVtx;
+	int cell1, cell2, cell3, iCell, iVtx;
 	int current_vertex;
 	int retval;
 	float cell1_dist, cell2_dist, cell3_dist;
