@@ -8,7 +8,7 @@ public:
 	RemapperEdge();
     RemapperEdge(int maxEdges, int nCellsSrc, int nEdgesDst, int nVertLevelsSrc, int nVertLevelsDst);
 	~RemapperEdge();
-	void remap(const std::type_info& t, int ndims, void *dst, void *src);
+	void remap(const std::type_info& t, int ndims, interp_type interp, void *dst, void *src);
 	void computeWeightsEdge(int *nEdgesOnCellSrc, int **cellsOnCellSrc, int **edgesOnCellSrc,
                             float *xCellSrc, float *yCellSrc, float *zCellSrc,
                             float *xEdgeSrc, float *yEdgeSrc, float *zEdgeSrc,
