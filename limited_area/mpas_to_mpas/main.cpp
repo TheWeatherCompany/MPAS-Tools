@@ -21,6 +21,7 @@ int main(int argc, char **argv)
     char qxNames[NUM_SCALARS][3] = {"qv", "qc", "qr", "qi", "qs", "qg"};
     
     NCField<float> *xCellDst, *yCellDst, *zCellDst;
+    NCField<int> *landmaskDst;
     NCField<float> *xEdgeDst, *yEdgeDst, *zEdgeDst;
     NCField<float> *angleEdgeDst;
     NCField<int> *cellsOnEdgeDst;
@@ -28,11 +29,27 @@ int main(int argc, char **argv)
     NCField<float> *zmidDst;
     NCField<float> *zedgeDst;
     NCField<float> *uDst;
+    NCField<float> *u10Dst;
     NCField<float> *vDst;
+    NCField<float> *v10Dst;
+    NCField<float> *q2Dst;
+    NCField<float> *t2mDst;
     NCField<float> *thetaDst;
     NCField<float> *rhoDst;
     NCField<float> *wDst;
+    NCField<float> *relhumDst;
+    NCField<float> *rho_baseDst;
+    NCField<float> *theta_baseDst;
+    NCField<float> *pressure_baseDst;
+//    NCField<float> *precipwDst;
     NCField<float> *presDst;
+    NCField<float> *tmnDst;
+    NCField<float> *skintempDst;
+    NCField<float> *snowDst;
+    NCField<float> *snowcDst;
+    NCField<float> *snowhDst;
+    NCField<float> *xiceDst;
+    NCField<float> *seaiceDst;
     NCField<float> *qxDst[NUM_SCALARS];
     NCField<char> *xtime;
     float **zgridDstArr;
@@ -70,6 +87,7 @@ int main(int argc, char **argv)
     RemapperCell *cellLayerMap;
     RemapperCell *cellLevelMap;
     RemapperCell *cellToEdgeMap;
+    NCField<int> *landmaskSrc;
     RemapperEdge *edgeMap;
     int secs, nsecs;
     int itime;
@@ -122,6 +140,7 @@ int main(int argc, char **argv)
         xEdgeDst = new NCField<float>(ncid, "xEdge");
         yEdgeDst = new NCField<float>(ncid, "yEdge");
         zEdgeDst = new NCField<float>(ncid, "zEdge");
+        landmaskDst = new NCField<int>(ncid, "landmask");
         angleEdgeDst = new NCField<float>(ncid, "angleEdge");
         cellsOnEdgeDst = new NCField<int>(ncid, "cellsOnEdge");
         zgridDst = new NCField<float>(ncid, "zgrid");
@@ -173,6 +192,7 @@ int main(int argc, char **argv)
     //
     // Read mesh description fields from global IC file
     //
+    size_t nCellSrc = 0;
     start_timer(0);
     try {
         int stat, ncid;
@@ -203,7 +223,8 @@ int main(int argc, char **argv)
         cellsOnEdgeSrc = new NCField<int>(ncid, "cellsOnEdge");
         edgesOnCellSrc = new NCField<int>(ncid, "edgesOnCell");
         zgridSrc = new NCField<float>(ncid, "zgrid");
-        
+        landmaskSrc = new NCField<int>(ncid, "landmask");
+ 
         float sphere_radius;
         stat = nc_get_att_float (ncid, NC_GLOBAL, "sphere_radius", &sphere_radius);
         if (stat != NC_NOERR) {
@@ -218,6 +239,8 @@ int main(int argc, char **argv)
         // normalize
         float *xArr, *yArr, *zArr;
         size_t nCells = static_cast<size_t>(xCellSrc->dimSize("nCells"));
+        nCellSrc = nCells;
+        fprintf(stderr,"nCells from xCellSrc: %d\n",nCells);
         xArr = xCellSrc->ptr1D();
         yArr = yCellSrc->ptr1D();
         zArr = zCellSrc->ptr1D();
@@ -268,7 +291,6 @@ int main(int argc, char **argv)
     zmidDst = new NCField<float>("zmid", 2, "nCells", zgridDst->dimSize("nCells"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
     zedgeDst = new NCField<float>("zedge", 2, "nEdges", xEdgeDst->dimSize("nEdges"), "nVertLevels", zgridDst->dimSize("nVertLevelsP1")-1);
     
-    
     //
     // Average global grid zgrid field to layer midpoints and then to edges
     //
@@ -298,37 +320,43 @@ int main(int argc, char **argv)
     //
     start_timer(0);
     cellLevelMap = new RemapperCell(xCellDst->dimSize("nCells"), zgridSrc->dimSize("nVertLevelsP1"), zgridDst->dimSize("nVertLevelsP1"), 3);
-    cellLevelMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+    cellLevelMap->computeWeightsCell( nCellSrc, nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(), cellsOnCellSrc->ptr2D(),
                                      xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                      xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                     xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zgridDst->ptr2D());
+                                     landmaskSrc->ptr1D(), 
+                                     xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), landmaskDst->ptr1D(), 
+                                     zgridDst->ptr2D());
     stop_timer(0, &secs, &nsecs);
     printf("Time to create cellLevelMap : %i.%9.9i\n", secs, nsecs);
     
     
+
     //
     // Compute weights for remapping cell-based fields on layers
     //
     start_timer(0);
     cellLayerMap = new RemapperCell(xCellDst->dimSize("nCells"), zmidSrc->dimSize("nVertLevels"), zmidDst->dimSize("nVertLevels"), 3);
-    cellLayerMap->computeWeightsCell( nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+    cellLayerMap->computeWeightsCell( nCellSrc, nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(), cellsOnCellSrc->ptr2D(),
                                      xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                      xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                     xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), zmidDst->ptr2D());
+                                     landmaskSrc->ptr1D(),
+                                     xCellDst->ptr1D(), yCellDst->ptr1D(), zCellDst->ptr1D(), landmaskDst->ptr1D(),
+                                     zmidDst->ptr2D() );
     stop_timer(0, &secs, &nsecs);
     printf("Time to create cellLayerMap : %i.%9.9i\n", secs, nsecs);
-    
-    
+
     //
     // Compute weights for remapping cell-based fields to edges (used for interpolating uReconstruct{Zonal,Meridional} to u)
     //
     if (use_reconstruct_winds) {
         start_timer(0);
         cellToEdgeMap = new RemapperCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3);
-        cellToEdgeMap->computeWeightsCell(nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(),
+        cellToEdgeMap->computeWeightsCell(nCellSrc, nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(), cellsOnCellSrc->ptr2D(),
                                           xCellSrc->ptr1D(), yCellSrc->ptr1D(), zCellSrc->ptr1D(),
                                           xVertexSrc->ptr1D(), yVertexSrc->ptr1D(), zVertexSrc->ptr1D(), zmidSrc->ptr2D(),
-                                          xEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), zedgeDst->ptr2D());
+                                          landmaskSrc->ptr1D(),
+                                          xEdgeDst->ptr1D(), yEdgeDst->ptr1D(), zEdgeDst->ptr1D(), landmaskDst->ptr1D(),
+                                          zedgeDst->ptr2D() );
         // !! zEdgeDst is the z-coordinate of the edge in Cartesian space,
         //    zedgeDst is the height field of the edges
         stop_timer(0, &secs, &nsecs);
@@ -488,8 +516,60 @@ int main(int argc, char **argv)
         stat = rhoDst->defineInFile(ncid);
         wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevelsP1", nVertLevels+1);
         stat = wDst->defineInFile(ncid);
+
+
+        // Added by Todd Hutchinson during upgrade to be able to use ecmwf input
+        relhumDst = new NCField<float>("relhum", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+        stat = relhumDst->defineInFile(ncid);
+
+        rho_baseDst = new NCField<float>("rho_base", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+        stat = rho_baseDst->defineInFile(ncid);
+
+        theta_baseDst = new NCField<float>("theta_base", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+        stat = theta_baseDst->defineInFile(ncid);
+
+        pressure_baseDst = new NCField<float>("pressure_base", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+        stat = pressure_baseDst->defineInFile(ncid);
+
+//        precipwDst = new NCField<float>("precipw", 2, "Time", (size_t)1, "nCells", nCells);
+//        stat = precipwDst->defineInFile(ncid);
+
+        tmnDst = new NCField<float>("tmn", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = tmnDst->defineInFile(ncid);
+
+        skintempDst = new NCField<float>("skintemp", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = skintempDst->defineInFile(ncid);
+
+        snowDst = new NCField<float>("snow", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = snowDst->defineInFile(ncid);
+
+        snowcDst = new NCField<float>("snowc", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = snowcDst->defineInFile(ncid);
+
+        snowhDst = new NCField<float>("snowh", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = snowhDst->defineInFile(ncid);
+
+        xiceDst = new NCField<float>("xice", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = xiceDst->defineInFile(ncid);
+
+        seaiceDst = new NCField<float>("seaice", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = seaiceDst->defineInFile(ncid);
+
+        u10Dst = new NCField<float>("u10", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = u10Dst->defineInFile(ncid);
+
+        v10Dst = new NCField<float>("v10", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = v10Dst->defineInFile(ncid);
+
+        q2Dst = new NCField<float>("q2", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = q2Dst->defineInFile(ncid);
+
+        t2mDst = new NCField<float>("t2m", 2, "Time", (size_t)1, "nCells", nCells);
+        stat = t2mDst->defineInFile(ncid);
+
         presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", nCells);
         stat = presDst->defineInFile(ncid);
+
         stat = nc_enddef(ncid);
         
         stat = xtime->writeToFile(ncid);
@@ -511,7 +591,7 @@ int main(int argc, char **argv)
         for (int i=0; i<NUM_SCALARS; i++) {
             if (scalars_found[i]) {
                 NCField<float> * qxSrc = new NCField<float>(src_ncid, qxNames[i]);
-                qxDst[i]->remapFrom(*qxSrc, *cellLayerMap);
+                qxDst[i]->remapFrom(*qxSrc, *cellLayerMap, RemapperCell::barycentric);
                 stat = qxDst[i]->writeToFile(ncid);
                 if (stat != NC_NOERR) throw stat;
                 delete qxSrc;
@@ -563,7 +643,7 @@ int main(int argc, char **argv)
         
         printf("Remapping other scalars\n");
         NCField<float> * thetaSrc = new NCField<float>(globalFieldFile, "theta");
-        thetaDst->remapFrom(*thetaSrc, *cellLayerMap);
+        thetaDst->remapFrom(*thetaSrc, *cellLayerMap, RemapperCell::barycentric);
         printf("Writing theta\n");
         stat = thetaDst->writeToFile(ncid);
         if (stat != NC_NOERR) throw stat;
@@ -571,7 +651,7 @@ int main(int argc, char **argv)
         delete thetaDst;
         
         NCField<float> * rhoSrc = new NCField<float>(globalFieldFile, "rho");
-        rhoDst->remapFrom(*rhoSrc, *cellLayerMap);
+        rhoDst->remapFrom(*rhoSrc, *cellLayerMap, RemapperCell::barycentric);
         printf("Writing rho\n");
         stat = rhoDst->writeToFile(ncid);
         if (stat != NC_NOERR) throw stat;
@@ -579,15 +659,145 @@ int main(int argc, char **argv)
         delete rhoDst;
         
         NCField<float> * wSrc = new NCField<float>(globalFieldFile, "w");
-        wDst->remapFrom(*wSrc, *cellLevelMap);
+        wDst->remapFrom(*wSrc, *cellLevelMap, RemapperCell::barycentric);
         printf("Writing w\n");
         stat = wDst->writeToFile(ncid);
         if (stat != NC_NOERR) throw stat;
         delete wSrc;
         delete wDst;
+
+        NCField<float> * relhumSrc = new NCField<float>(globalFieldFile, "relhum");
+        relhumDst->remapFrom(*relhumSrc, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing relhum\n");
+        stat = relhumDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete relhumSrc;
+        delete relhumDst;
         
+        NCField<float> * rho_baseSrc = new NCField<float>(globalFieldFile, "rho_base");
+        rho_baseDst->remapFrom(*rho_baseSrc, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing rho_base\n");
+        stat = rho_baseDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete rho_baseSrc;
+        delete rho_baseDst;
+
+        NCField<float> * theta_baseSrc = new NCField<float>(globalFieldFile, "theta_base");
+        theta_baseDst->remapFrom(*theta_baseSrc, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing theta_base\n");
+        stat = theta_baseDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete theta_baseSrc;
+        delete theta_baseDst;
+
+        NCField<float> * pressure_baseSrc = new NCField<float>(globalFieldFile, "pressure_base");
+        pressure_baseDst->remapFrom(*pressure_baseSrc, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing pressure_base\n");
+        stat = pressure_baseDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete pressure_baseSrc;
+        delete pressure_baseDst;
+
+/*
+ * NCField<float> * precipwSrc = new NCField<float>(globalFieldFile, "precipw");
+        precipwDst->remapFrom(*precipwSrc, *cellLayerMap);
+        printf("Writing precipw\n");
+        stat = precipwDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete precipwSrc;
+        delete precipwDst;
+*/
+
+        NCField<float> * tmnSrc = new NCField<float>(globalFieldFile, "tmn");
+        tmnDst->remapFrom(*tmnSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing tmn\n");
+        stat = tmnDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete tmnSrc;
+        delete tmnDst;
+
+        NCField<float> * skintempSrc = new NCField<float>(globalFieldFile, "skintemp");
+        skintempDst->remapFrom(*skintempSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing skintemp\n");
+        stat = skintempDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete skintempSrc;
+        delete skintempDst;
+
+        NCField<float> * snowSrc = new NCField<float>(globalFieldFile, "snow");
+        snowDst->remapFrom(*snowSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing snow\n");
+        stat = snowDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete snowSrc;
+        delete snowDst;
+
+        NCField<float> * snowcSrc = new NCField<float>(globalFieldFile, "snowc");
+        snowcDst->remapFrom(*snowcSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing snowc\n");
+        stat = snowcDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete snowcSrc;
+        delete snowcDst;
+
+        NCField<float> * snowhSrc = new NCField<float>(globalFieldFile, "snowh");
+        snowhDst->remapFrom(*snowhSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing snowh\n");
+        stat = snowhDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete snowhSrc;
+        delete snowhDst;
+
+        NCField<float> * xiceSrc = new NCField<float>(globalFieldFile, "xice");
+        xiceDst->remapFrom(*xiceSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing xice\n");
+        stat = xiceDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete xiceSrc;
+        delete xiceDst;
+        
+        NCField<float> * seaiceSrc = new NCField<float>(globalFieldFile, "seaice");
+        seaiceDst->remapFrom(*seaiceSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+        printf("Writing seaice\n");
+        stat = seaiceDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete seaiceSrc;
+        delete seaiceDst;
+        
+        NCField<float> * u10Src = new NCField<float>(globalFieldFile, "u10");
+        u10Dst->remapFrom(*u10Src, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing u10\n");
+        stat = u10Dst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete u10Src;
+        delete u10Dst;
+
+        NCField<float> * v10Src = new NCField<float>(globalFieldFile, "v10");
+        v10Dst->remapFrom(*v10Src, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing v10\n");
+        stat = v10Dst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete v10Src;
+        delete v10Dst;
+
+        NCField<float> * q2Src = new NCField<float>(globalFieldFile, "q2");
+        q2Dst->remapFrom(*q2Src, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing q2\n");
+        stat = q2Dst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete q2Src;
+        delete q2Dst;
+
+        NCField<float> * t2mSrc = new NCField<float>(globalFieldFile, "t2m");
+        t2mDst->remapFrom(*t2mSrc, *cellLayerMap, RemapperCell::barycentric);
+        printf("Writing t2m\n");
+        stat = t2mDst->writeToFile(ncid);
+        if (stat != NC_NOERR) throw stat;
+        delete t2mSrc;
+        delete t2mDst;
+
         NCField<float> * presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
-        presDst->remapFrom(*presSrc, *cellLayerMap);
+        presDst->remapFrom(*presSrc, *cellLayerMap, RemapperCell::barycentric);
         printf("Writing surface_pressure\n");
         stat = presDst->writeToFile(ncid);
         if (stat != NC_NOERR) throw stat;

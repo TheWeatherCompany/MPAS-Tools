@@ -353,7 +353,8 @@ public:
     }
     
     
-    void remapFrom(NCField<fieldType>& src, RemapperBase& map)
+    void remapFrom(NCField<fieldType>& src, RemapperBase& map, 
+            RemapperBase::interp_type interp = RemapperBase::barycentric)
     {
         if (ndims == 1 && src.rank() == 1) {
             void *src1d;
@@ -361,7 +362,7 @@ public:
             
             src1d = src.ptr1D();
             dst1d = ptr1D();
-            map.remap(typeid(fieldType), 1, dst1d, src1d);
+            map.remap(typeid(fieldType), 1, interp, dst1d, src1d);
         }
         else if (ndims == 2 && src.rank() == 2) {
             void *src2d;
@@ -369,7 +370,7 @@ public:
             
             src2d = src.ptr2D();
             dst2d = ptr2D();
-            map.remap(typeid(fieldType), 2, dst2d, src2d);
+            map.remap(typeid(fieldType), 2, interp, dst2d, src2d);
         }
         else if (ndims == 3 && src.rank() == 3) {
             void *src3d;
@@ -377,7 +378,7 @@ public:
             
             src3d = src.ptr3D();
             dst3d = ptr3D();
-            map.remap(typeid(fieldType), 3, dst3d, src3d);
+            map.remap(typeid(fieldType), 3, interp, dst3d, src3d);
         }
         else {
             throw "Either src and dst ranks are different or they are of unsupported rank";

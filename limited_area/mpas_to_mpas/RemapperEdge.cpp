@@ -137,7 +137,7 @@ void RemapperEdge::computeWeightsEdge(int *nEdgesOnCellSrc, int **cellsOnCellSrc
 	}
 }
 
-void RemapperEdge::remap(const std::type_info& t, int ndims, void *dst, void *src)
+void RemapperEdge::remap(const std::type_info& t, int ndims, interp_type interp, void *dst, void *src)
 {
 	if (std::type_index(t) == typeid(float)) {
 		if (ndims == 1) {

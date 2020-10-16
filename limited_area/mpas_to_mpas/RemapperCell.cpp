@@ -19,6 +19,10 @@ RemapperCell::RemapperCell()
 	nHSrcPts = NULL;
 	HSrcPts = NULL;
 	HSrcWghts = NULL;
+	HSrcNearest = NULL;
+	HSrcNearestLand = NULL;
+	HSrcNearestWater = NULL;
+	HSrcNearestSameLandmask = NULL;
 
 	nVDstPts = 0;
 	nVSrcLevels = 0;
@@ -35,7 +39,11 @@ RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst
     nHSrcPts = new int[nHDstPts];   // set to all 1 for now...
     HSrcPts = new int[(size_t)nHDstPts * (size_t)maxHSrcPts];
     HSrcWghts = new float[(size_t)nHDstPts * (size_t)maxHSrcPts];
-    
+    HSrcNearest = new int[(size_t)nHDstPts];
+    HSrcNearestLand = new int[(size_t)nHDstPts];
+    HSrcNearestWater = new int[(size_t)nHDstPts];
+    HSrcNearestSameLandmask = new int[(size_t)nHDstPts];
+
     nVDstPts = nVertLevelsDst;
     nVSrcLevels = nVertLevelsSrc;
     maxVSrcPts = 2;
@@ -52,18 +60,24 @@ RemapperCell::~RemapperCell()
 	if (nHSrcPts != NULL) delete[] nHSrcPts;
 	if (HSrcPts != NULL) delete[] HSrcPts;
 	if (HSrcWghts != NULL) delete[] HSrcWghts;
+	if (HSrcNearest != NULL) delete[] HSrcNearest;
+	if (HSrcNearestLand != NULL) delete[] HSrcNearestLand;
+	if (HSrcNearestWater != NULL) delete[] HSrcNearestWater;
+	if (HSrcNearestSameLandmask != NULL) delete[] HSrcNearestSameLandmask;
 
 	if (nVSrcPts != NULL) delete[] nVSrcPts;
 	if (VSrcPts != NULL) delete[] VSrcPts;
 	if (VSrcWghts != NULL) delete[] VSrcWghts;
 }
 
-void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCellSrc, int **cellsOnVertexSrc,
+void RemapperCell::computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **verticesOnCellSrc, 
+                                      int **cellsOnVertexSrc, int **cellsOnCellSrc,
                                       float *xCellSrc, float *yCellSrc, float *zCellSrc,
                                       float *xVertexSrc, float *yVertexSrc, float *zVertexSrc, float **levelsSrc,
-                                      float *xCellDst, float *yCellDst, float *zCellDst, float **levelsDst)
+                                      int *landmaskSrc,
+                                      float *xCellDst, float *yCellDst, float *zCellDst, int *landmaskDst, 
+                                      float **levelsDst)
 {
-	int j;
 	int nCells;
 	float tempLevels[nVSrcLevels];
 	float vertCoords[maxHSrcPts][3];
@@ -74,6 +88,10 @@ void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCell
 #pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
 	for (int i=0; i<nHDstPts; i++) {
 		nHSrcPts[i] = maxHSrcPts;
+        if (i % 1000000 == 0) {
+            fprintf(stderr,"processing i: %d\n",i);
+            fprintf(stderr,"nHSrcPts[i]: %d\n",nHSrcPts[i]);
+        }
 		jCell = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], jCell, maxHSrcPts,
                            nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
                            xCellSrc, yCellSrc, zCellSrc, xVertexSrc, yVertexSrc, zVertexSrc);
@@ -89,8 +107,67 @@ void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCell
             vertCoords[iv][1] = yCellSrc[HSrcPts2d(i,iv)];
             vertCoords[iv][2] = zCellSrc[HSrcPts2d(i,iv)];
         }
+        mpas_wachspress_coordinates(maxHSrcPts, vertCoords, pointInterp, HSrcWghts + (i*maxHSrcPts));
+        float maxWght = 0.0;
+        float maxWghtLand = 0.0;
+        float maxWghtWater = 0.0;
+        float maxWghtSameLandmask = 0.0;
+        int maxWghtPt = -1;
+        int maxWghtPtLand = -1;
+        int maxWghtPtWater = -1;
+        int maxWghtPtSameLandmask = -1;
+        for (int j = 0; j < nHSrcPts[i]; j++)
+        {
+            if (HSrcWghts2d(i,j) > maxWght)
+            {
+                maxWghtPt = HSrcPts2d(i,j);
+                maxWght = *(HSrcWghts + (i*maxHSrcPts) + j);
+            }
+            if (landmaskSrc[HSrcPts2d(i,j)] == 1)
+            {
+                if (HSrcWghts2d(i,j) > maxWghtLand)
+                {
+                    maxWghtPtLand = HSrcPts2d(i,j);
+                    maxWghtLand = *(HSrcWghts + (i*maxHSrcPts) + j);
+                }
+            }
+            if (landmaskSrc[HSrcPts2d(i,j)] == 0)
+            {
+                if (HSrcWghts2d(i,j) > maxWghtWater)
+                {
+                    maxWghtPtWater = HSrcPts2d(i,j);
+                    maxWghtWater = *(HSrcWghts + (i*maxHSrcPts) + j);
+                }
+            }
+            if (landmaskSrc[HSrcPts2d(i,j)] == landmaskDst[i])
+            {
+                if (HSrcWghts2d(i,j) > maxWghtSameLandmask)
+                {
+                    maxWghtPtSameLandmask = HSrcPts2d(i,j);
+                    maxWghtSameLandmask = *(HSrcWghts + (i*maxHSrcPts) + j);
+                }
+            }
+            if (i % 1000000 == 0) {
+                fprintf(stderr,"i: %d j: %d HSrcPts2d(i,j): %d\n",i,j,HSrcPts2d(i,j));
+            }
+        }
 
-		mpas_wachspress_coordinates(maxHSrcPts, vertCoords, pointInterp, HSrcWghts + (i*maxHSrcPts));
+        HSrcNearest[i] = maxWghtPt;
+
+        if (maxWghtPtLand != -1)
+            HSrcNearestLand[i] = maxWghtPtLand;
+        else
+            HSrcNearestLand[i] = maxWghtPt;
+
+        if (maxWghtPtWater != -1)
+            HSrcNearestWater[i] = maxWghtPtWater;
+        else
+            HSrcNearestWater[i] = maxWghtPt;
+
+        if (maxWghtPtSameLandmask != -1)
+            HSrcNearestSameLandmask[i] = maxWghtPtSameLandmask;
+        else
+            HSrcNearestSameLandmask[i] = maxWghtPt;
 
 		if (do3d) {
 			// Horizontally interpolate column of levelsSrc values
@@ -115,23 +192,78 @@ void RemapperCell::computeWeightsCell(int *nEdgesOnCellSrc, int **verticesOnCell
 }
 
 
-void RemapperCell::remap(const std::type_info& t, int ndims, void *dst, void *src)
+void RemapperCell::remap(const std::type_info& t, int ndims, interp_type interp, void *dst, void *src)
 {
+    std::cout << "interp: " << interp << " barycentric: " << barycentric << std::endl;
+    std::cout << "ndims: " << ndims << std::endl;
 	if (std::type_index(t) == typeid(float)) {
 		if (ndims == 1) {
 			float *dstf = (float *)dst;
 			float *srcf = (float *)src;
-			remap1D(dstf, srcf);
+            if (interp == nearest)
+            {
+                remap1DNearest(dstf, srcf, HSrcNearest);
+            } 
+            else if (interp == nearest_land)
+            {
+                remap1DNearest(dstf, srcf, HSrcNearestLand);
+            } 
+            else if (interp == nearest_water)
+            {
+                remap1DNearest(dstf, srcf, HSrcNearestWater);
+            } 
+            else if (interp == nearest_samelandmask)
+            {
+                remap1DNearest(dstf, srcf, HSrcNearestSameLandmask);
+            }
+            else if (interp == barycentric) 
+            {
+                remap1D(dstf, srcf);
+            } 
+            else 
+            {
+                std::cout << "Unsupported interpolation type for 1D field: " << interp << std::endl;
+            }
 		}
 		else if (ndims == 2) {
 			float **dstf = (float **)dst;
 			float **srcf = (float **)src;
-			remap2D(dstf, srcf);
+            if (interp == nearest)
+            {
+                remap2DNearest(dstf, srcf, HSrcNearest);
+            } 
+            else if (interp == nearest_land)
+            {
+                remap2DNearest(dstf, srcf, HSrcNearestLand);
+            } 
+            else if (interp == nearest_water)
+            {
+                remap2DNearest(dstf, srcf, HSrcNearestWater);
+            } 
+            else if (interp == nearest_samelandmask)
+            {
+                remap2DNearest(dstf, srcf, HSrcNearestSameLandmask);
+            }
+            else if (interp == barycentric) 
+            {
+                remap2D(dstf, srcf);
+            }
+            else 
+            {
+                std::cout << "Unsupported interpolation type for 2D field: " << interp << std::endl;
+            }
 		}
 		else if (ndims == 3) {
 			float ***dstf = (float ***)dst;
 			float ***srcf = (float ***)src;
-			remap3D(dstf, srcf);
+            if (interp == barycentric)
+            {
+                remap3D(dstf, srcf);
+            } 
+            else 
+            {
+                std::cout << "Unsupported interpolation type for 3D field: " << interp << std::endl;
+            }
 		}
 	}
 	else {
@@ -151,6 +283,16 @@ void RemapperCell::remap1D(float *dst, float *src)
 	}
 }
 
+void RemapperCell::remap1DNearest(float *dst, float *src, int *nearestMap)
+{
+	std::cerr << "Remapping 1d field using nearest\n";
+
+	// TODO: Right now, the time dimension is the first dimension
+    for (int i=0; i<nHDstPts; i++) {
+        dst[i] = src[nearestMap[i]];
+    }
+}
+
 void RemapperCell::remap2D(float **dst, float **src)
 {
 	std::cerr << "Remapping 2d field\n";
@@ -164,6 +306,17 @@ void RemapperCell::remap2D(float **dst, float **src)
 	}
 }
 
+void RemapperCell::remap2DNearest(float **dst, float **src, int *nearestMap)
+{
+	std::cerr << "Remapping 2d field using nearest\n";
+
+	// TODO: Right now, the time dimension is the first dimension
+    for (int i=0; i<nHDstPts; i++) {
+        dst[0][i] = src[0][nearestMap[i]];
+    }
+}
+
+
 void RemapperCell::remap3D(float ***dst, float ***src)
 {
 	std::cerr << "Remapping 3d field\n";
@@ -171,7 +324,7 @@ void RemapperCell::remap3D(float ***dst, float ***src)
 	float tempLevels[nVSrcLevels];
 
 	// TODO: Right now, the time dimension is the first dimension
-#pragma omp parallel for private(tempLevels) schedule(dynamic,1000)
+//#pragma omp parallel for private(tempLevels) schedule(dynamic,1000)
 	for (size_t i=0; i<nHDstPts; i++) {
 		// Horizontally interpolate column of levelsSrc values
 		for (int k=0; k<nVSrcLevels; k++) {
