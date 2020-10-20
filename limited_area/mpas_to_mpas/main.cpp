@@ -47,7 +47,6 @@ int main(int argc, char **argv)
     NCField<float> *xiceDst;
     NCField<float> *seaiceDst;
     NCField<float> *dzsDst;
-    NCField<float> *sh2oDst;
     NCField<float> *smoisDst;
     NCField<float> *tslbDst;
     NCField<float> *qxDst[NUM_SCALARS];
@@ -543,9 +542,6 @@ int main(int argc, char **argv)
         seaiceDst = new NCField<float>("seaice", 2, "Time", (size_t)1, "nCells", nCells);
         stat = seaiceDst->defineInFile(ncid);
 
-        sh2oDst = new NCField<float>("sh2o", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
-        stat = sh2oDst->defineInFile(ncid);
-
         smoisDst = new NCField<float>("smois", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
         stat = smoisDst->defineInFile(ncid);
 
@@ -738,14 +734,6 @@ int main(int argc, char **argv)
         delete seaiceSrc;
         delete seaiceDst;
         
-        NCField<float> * sh2oSrc = new NCField<float>(globalFieldFile, "sh2o");
-        sh2oDst->remapFrom(*sh2oSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing sh2o\n");
-        stat = sh2oDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete sh2oSrc;
-        delete sh2oDst;
-
         NCField<float> * smoisSrc = new NCField<float>(globalFieldFile, "smois");
         smoisDst->remapFrom(*smoisSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
         printf("Writing smois\n");
