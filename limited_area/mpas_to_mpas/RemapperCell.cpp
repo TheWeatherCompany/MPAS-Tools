@@ -32,7 +32,7 @@ RemapperCell::RemapperCell()
 	VSrcWghts = NULL;
 }
 
-RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree)
+RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree, int nSoilLevs)
 {
     nHDstPts = nCellsDst;
     maxHSrcPts = vertexDegree;
@@ -47,6 +47,7 @@ RemapperCell::RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst
     nVDstPts = nVertLevelsDst;
     nVSrcLevels = nVertLevelsSrc;
     maxVSrcPts = 2;
+    nSoilLevels = nSoilLevs;
     
     if (nVSrcLevels > 0 && nVDstPts > 0) {
         nVSrcPts = new int[(size_t)nHDstPts * (size_t)nVDstPts];
@@ -89,7 +90,6 @@ void RemapperCell::computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **
 		nHSrcPts[i] = maxHSrcPts;
         if (i % 1000000 == 0) {
             fprintf(stderr,"processing i: %d\n",i);
-            fprintf(stderr,"nHSrcPts[i]: %d\n",nHSrcPts[i]);
         }
 		jCell = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], jCell, maxHSrcPts,
                            nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
@@ -254,6 +254,22 @@ void RemapperCell::remap(const std::type_info& t, int ndims, interp_type interp,
             {
                 remap3D(dstf, srcf);
             } 
+            else if (interp == nearest_land)
+            {
+                remap3DNearest(dstf, srcf, HSrcNearestLand);
+            }
+            else if (interp == nearest_water)
+            {
+                remap3DNearest(dstf, srcf, HSrcNearestWater);
+            }
+            else if (interp == nearest_samelandmask)
+            {
+                remap3DNearest(dstf, srcf, HSrcNearestSameLandmask);
+            }
+            else if (interp == nearest_samelandmask_soil)
+            {
+                remap3DNearestSoil(dstf, srcf, HSrcNearestSameLandmask);
+            }
             else 
             {
                 std::cout << "Unsupported interpolation type for 3D field: " << interp << std::endl;
@@ -332,6 +348,44 @@ void RemapperCell::remap3D(float ***dst, float ***src)
 			for (int k=0; k<nVSrcLevels; k++) {
 				tempLevels[k] += (HSrcWghts2d(i,j) * src[0][HSrcPts2d(i,j)][k]);
 			}
+		}
+
+		// For each vertical destination point, interpolate
+		for (size_t k=0; k<nVDstPts; k++) {
+			dst[0][i][k] = 0;
+			for (size_t j=0; j<nVSrcPts2d(i,k); j++) {
+				dst[0][i][k] += VSrcWghts3d(i,k,j) * tempLevels[VSrcPts3d(i,k,j)];
+			}
+		}
+	}
+}
+
+void RemapperCell::remap3DNearestSoil(float ***dst, float ***src, int *nearestMap)
+{
+    std::cerr << "Remapping 3d soil field for " << nSoilLevels << " levels. \n";
+
+	// TODO: Right now, the time dimension is the first dimension
+#pragma omp parallel for schedule(dynamic,1000)
+	for (size_t i=0; i<nHDstPts; i++) {
+		// Horizontally interpolate column of levelsSrc values
+		for (int k=0; k<nSoilLevels; k++) {
+			dst[0][i][k] = src[0][nearestMap[i]][k];
+		}
+	}
+}
+
+void RemapperCell::remap3DNearest(float ***dst, float ***src, int *nearestMap)
+{
+	std::cerr << "Remapping 3d field\n";
+
+	float tempLevels[nVSrcLevels];
+
+	// TODO: Right now, the time dimension is the first dimension
+#pragma omp parallel for private(tempLevels) schedule(dynamic,1000)
+	for (size_t i=0; i<nHDstPts; i++) {
+		// Horizontally interpolate column of levelsSrc values
+		for (int k=0; k<nVSrcLevels; k++) {
+			tempLevels[k] = src[0][nearestMap[i]][k];
 		}
 
 		// For each vertical destination point, interpolate

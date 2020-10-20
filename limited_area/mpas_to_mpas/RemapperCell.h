@@ -6,7 +6,7 @@
 class RemapperCell : virtual public RemapperBase {
 public:
 	RemapperCell();
-    RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree);
+    RemapperCell(int nCellsDst, int nVertLevelsSrc, int nVertLevelsDst, int vertexDegree, int nSoilLevs=0);
 	~RemapperCell();
 	void remap(const std::type_info& t, int ndims, interp_type interp, void *dst, void *src);
 	void computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **verticesOnCellSrc, 
@@ -39,6 +39,8 @@ private:
 	size_t nVDstPts;      // Number of vertical destination points
 	size_t nVSrcLevels;   // Number of vertical source points
 	size_t maxVSrcPts;    // Maximum number of vertical source points needed by any destination point
+    size_t nSoilLevels;   // Number of soil levels -- will be same for src and dst, as vertical interpolation
+                          //   of soil is not supported.
 	int *nVSrcPts;     // Number of vertical source points needed by any destination point
 	int *VSrcPts;      // Source points needed for vertical interpolation to each destination point
 	float *VSrcWghts;  // Source weights needed for vertical interpolation to each destination point
@@ -51,5 +53,7 @@ private:
 	void remap2D(float **dst, float **src);
 	void remap2DNearest(float **dst, float **src, int *nearestMap);
 	void remap3D(float ***dst, float ***src);
+    void remap3DNearest(float ***dst, float ***src, int *nearestMap);
+    void remap3DNearestSoil(float ***dst, float ***src, int *nearestMap);
 };
 #endif
