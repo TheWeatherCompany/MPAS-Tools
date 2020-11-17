@@ -3,7 +3,7 @@
 OBJS = main.o timer_newer.o RemapperBase.o RemapperCell.o RemapperEdge.o NCFieldBase.o mpas_utils.o interp_utils.o
 
 CXX = mpicxx -std=c++11 -mp -O3
-CXXFLAGS = -I${NETCDF}/include
+CXXFLAGS = -I${NETCDF}/include -I${NETCDF_CXX4}/include
 LDFLAGS = -L${NETCDF}/lib -L$(NETCDF_FORTRAN)/lib -L$(PNETCDF)/lib -L$(HDF5)/lib -lnetcdf -lnetcdff -lpnetcdf -lhdf5_hl -lhdf5 -lz 
 
 all: $(OBJS)
