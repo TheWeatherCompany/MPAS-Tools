@@ -88,9 +88,6 @@ void RemapperCell::computeWeightsCell(int nCellSrc, int *nEdgesOnCellSrc, int **
 #pragma omp parallel for firstprivate(jCell) private(pointInterp, vertCoords, tempLevels)
 	for (int i=0; i<nHDstPts; i++) {
 		nHSrcPts[i] = maxHSrcPts;
-        if (i % 1000000 == 0) {
-            fprintf(stderr,"processing i: %d\n",i);
-        }
 		jCell = nearest_vertex(xCellDst[i], yCellDst[i], zCellDst[i], jCell, maxHSrcPts,
                            nEdgesOnCellSrc, verticesOnCellSrc, cellsOnVertexSrc,
                            xCellSrc, yCellSrc, zCellSrc, xVertexSrc, yVertexSrc, zVertexSrc);
