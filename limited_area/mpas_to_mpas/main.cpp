@@ -59,6 +59,7 @@ int main(int argc, char **argv)
     const char *globalMeshFile;
     const char *targetMeshFile;
     const char *globalFieldFile;
+    const char *outputFile;
     char targetFieldFile[64];
     char **xtimeArr;
     char date[20];
@@ -92,36 +93,87 @@ int main(int argc, char **argv)
     int itime;
     int argv_idx;
     int use_reconstruct_winds;
+    // The next three options exclude fields in the interpolation.
+    //
+    // Exclude Theta, Rho, Q[x]
+    int exclude_t_qx_rho;
+    // Exclude Winds
+    int exclude_winds;
+    // Exclude T2, Q2, U10, V10, SoilT, SoilM, 
+    // Snow, Ice, TMN, PSFC, TSK
+    int exclude_lsm_diag;
     
-    
-    if (argc < 4) {
-        std::cerr << "\nUsage: " << argv[0] << " [--use-reconstruct-winds] <global_IC_file> <target_IC_file> <global_fields_file>+\n\n";
+   
+    // 5 Required Arguments 
+    if (argc < 5) {
+        std::cerr << "\nUsage: " << argv[0] << " [--exclude-t-qx-rho] [--exclude-lsm-diag]"
+                                               " [--exclude-winds] [--use-reconstruct-winds]"
+                                               " <global_mesh_file> <target_IC_file>"
+                                               " <output> <global_fields_file>\n\n";
         return 1;
     }
     
-    if (strcmp(argv[1], "--use-reconstruct-winds") == 0) {
-        std::cout << "Using reconstructed winds at cell centers...\n";
+    // Look for --exclude-t-qx-rho option. 
+    if (strcmp(argv[1], "--exclude-t-qx-rho") == 0) { 
+        std::cout << "Excluding Theta, Rho, and Q[x] ...\n";
         argv_idx = 2;
+        exclude_t_qx_rho = 1;
+    }
+    else {
+        std::cout << "Including Theta, Rho, and Q[x] ...\n";
+        argv_idx = 1;
+        exclude_t_qx_rho = 0;
+    }
+
+    // Look for --exclude-lsm-diag option.
+    if (strcmp(argv[argv_idx], "--exclude-lsm-diag") == 0) {
+        std::cout << "Excluding LSM fields and general diagnostics ...\n";
+        argv_idx++;
+        exclude_lsm_diag = 1;
+    }
+    else {
+        std::cout << "Including LSM fields and general diagnostics ...\n";
+        exclude_lsm_diag = 0;
+    }
+
+    // Look for --exclude-winds option.
+    if (strcmp(argv[argv_idx], "--exclude-winds") == 0) {
+        std::cout << "Excluding wind field(s) ...\n";
+        argv_idx++;
+        exclude_winds = 1;
+    }
+    else {
+        std::cout << "Including wind field(s) ...\n";
+        exclude_winds = 0;
+    }
+    
+    // Look for --use-reconstruct-winds option.
+    if (strcmp(argv[argv_idx], "--use-reconstruct-winds") == 0) {
+        if (!exclude_winds) {
+            std::cout << "Using reconstructed winds at cell centers ...\n";
+        }
+        argv_idx++;
         use_reconstruct_winds = 1;
     }
     else {
         //
         // Try to catch other uses options besides --use-reconstruct-winds
         //
-        if (argv[1][0] == '-') {
-            std::cerr << "Unrecognized option: " << argv[1] << std::endl;
-            std::cerr << "\nSupported options are: --use-reconstruct-winds\n";
+        if (argv[argv_idx][0] == '-') {
+            std::cerr << "Unrecognized option: " << argv[argv_idx] << std::endl;
             return 1;
         }
-        
-        std::cout << "Using normal component of winds at edges...\n";
-        argv_idx = 1;
+       
+        if (!exclude_winds) { 
+            std::cout << "Using normal component of winds at edges ...\n";
+        }
         use_reconstruct_winds = 0;
     }
+
     globalMeshFile = argv[argv_idx++];
     targetMeshFile = argv[argv_idx++];
-    
-    
+    outputFile = argv[argv_idx++];
+  
     //
     // Read mesh description fields from target IC file
     //
@@ -211,7 +263,7 @@ int main(int argc, char **argv)
         yVertexSrc = new NCField<float>(ncid, "yVertex");
         zVertexSrc = new NCField<float>(ncid, "zVertex");
         nEdgesOnCellSrc = new NCField<int>(ncid, "nEdgesOnCell");
-        if (!use_reconstruct_winds) {
+        if (!exclude_winds and !use_reconstruct_winds) {
             nEdgesOnEdgeSrc = new NCField<int>(ncid, "nEdgesOnEdge");
             weightsOnEdgeSrc = new NCField<float>(ncid, "weightsOnEdge");
             edgesOnEdgeSrc = new NCField<int>(ncid, "edgesOnEdge");
@@ -348,7 +400,7 @@ int main(int argc, char **argv)
     //
     // Compute weights for remapping cell-based fields to edges (used for interpolating uReconstruct{Zonal,Meridional} to u)
     //
-    if (use_reconstruct_winds) {
+    if (!exclude_winds and use_reconstruct_winds) {
         start_timer(0);
         cellToEdgeMap = new RemapperCell(xEdgeDst->dimSize("nEdges"), zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"), 3);
         cellToEdgeMap->computeWeightsCell(nCellSrc, nEdgesOnCellSrc->ptr1D(), verticesOnCellSrc->ptr2D(), cellsOnVertexSrc->ptr2D(), cellsOnCellSrc->ptr2D(),
@@ -368,7 +420,7 @@ int main(int argc, char **argv)
     // Compute weights for remapping edge-based fields on layers (only used for u and v right now; only needed if
     //    --use-reconstruct-winds not specified)
     //
-    if (!use_reconstruct_winds) {
+    if (!exclude_winds and !use_reconstruct_winds) {
         start_timer(0);
         edgeMap = new RemapperEdge(cellsOnCellSrc->dimSize("maxEdges"), xCellSrc->dimSize("nCells"), xEdgeDst->dimSize("nEdges"),
                                    zedgeSrc->dimSize("nVertLevels"), zedgeDst->dimSize("nVertLevels"));
@@ -421,18 +473,20 @@ int main(int argc, char **argv)
             std::cerr << "Error reading xtime field from " << globalFieldFile << std::endl;
             return 1;
         }
-        if (use_reconstruct_winds) {
-            // Defer reading uReconstructZonal/Meridional till needed
-        }
-        else {
-            try {
-                uSrc = new NCField<float>(globalFieldFile, "u");
+        if (!exclude_winds) {
+            if (use_reconstruct_winds) {
+                // Defer reading uReconstructZonal/Meridional till needed
             }
-            catch (int e) {
-                std::cerr << "Error reading u field from " << globalFieldFile << std::endl;
-                return 1;
-            }
-            vSrc = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", uSrc->dimSize("nEdges"), "nVertLevels", uSrc->dimSize("nVertLevels"));
+            else {
+                try {
+                    uSrc = new NCField<float>(globalFieldFile, "u");
+                }
+                catch (int e) {
+                    std::cerr << "Error reading u field from " << globalFieldFile << std::endl;
+                    return 1;
+                }
+                vSrc = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", uSrc->dimSize("nEdges"), "nVertLevels", uSrc->dimSize("nVertLevels"));
+            }    
         }
         stop_timer(0, &secs, &nsecs);
         printf("Time to read time-dependent fields from %s : %i.%9.9i\n", globalFieldFile, secs, nsecs);
@@ -441,52 +495,60 @@ int main(int argc, char **argv)
         //
         // Allocate fields for interpolated target mesh fields
         //
-        uDst = new NCField<float>("u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", nVertLevels);
-        vDst = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", nVertLevels);
+        if (!exclude_winds) {
+
+            uDst = new NCField<float>("u", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", nVertLevels);
+            vDst = new NCField<float>("v", 3, "Time", (size_t)1, "nEdges", angleEdgeDst->dimSize("nEdges"), "nVertLevels", nVertLevels);
         
-        //
-        // Reconstruct the global v field, and rotate the {u,v} vector field so that
-        // u is the zonal wind component and v is the meridional wind component
-        //
-        if (!use_reconstruct_winds) {
-            float ***uSrcArr = uSrc->ptr3D();
-            float ***vSrcArr = vSrc->ptr3D();
-            int * nEdgesOnEdgeSrcArr = nEdgesOnEdgeSrc->ptr1D();
-            int ** edgesOnEdgeSrcArr = edgesOnEdgeSrc->ptr2D();
-            float ** weightsOnEdgeSrcArr = weightsOnEdgeSrc->ptr2D();
-            float * angleEdgeSrcArr = angleEdgeSrc->ptr1D();
-            start_timer(0);
-            reconstruct_v(uSrc->dimSize("nEdges"), uSrc->dimSize("nVertLevels"), nEdgesOnEdgeSrcArr, edgesOnEdgeSrcArr, weightsOnEdgeSrcArr, uSrcArr[0], vSrcArr[0]);
-            rotate_winds(uSrc->dimSize("nEdges"), uSrc->dimSize("nVertLevels"), angleEdgeSrcArr, uSrcArr[0], vSrcArr[0], 1);
-            stop_timer(0, &secs, &nsecs);
-            printf("Time to reconstruct v and rotate winds : %i.%9.9i\n", secs, nsecs);
-            delete nEdgesOnEdgeSrc;
-            delete weightsOnEdgeSrc;
-            delete edgesOnEdgeSrc;
-            delete angleEdgeSrc;
+            //
+            // Reconstruct the global v field, and rotate the {u,v} vector field so that
+            // u is the zonal wind component and v is the meridional wind component
+            //
+            if (!use_reconstruct_winds) {
+                float ***uSrcArr = uSrc->ptr3D();
+                float ***vSrcArr = vSrc->ptr3D();
+                int * nEdgesOnEdgeSrcArr = nEdgesOnEdgeSrc->ptr1D();
+                int ** edgesOnEdgeSrcArr = edgesOnEdgeSrc->ptr2D();
+                float ** weightsOnEdgeSrcArr = weightsOnEdgeSrc->ptr2D();
+                float * angleEdgeSrcArr = angleEdgeSrc->ptr1D();
+                start_timer(0);
+                reconstruct_v(uSrc->dimSize("nEdges"), uSrc->dimSize("nVertLevels"), nEdgesOnEdgeSrcArr, edgesOnEdgeSrcArr, weightsOnEdgeSrcArr, uSrcArr[0], vSrcArr[0]);
+                rotate_winds(uSrc->dimSize("nEdges"), uSrc->dimSize("nVertLevels"), angleEdgeSrcArr, uSrcArr[0], vSrcArr[0], 1);
+                stop_timer(0, &secs, &nsecs);
+                printf("Time to reconstruct v and rotate winds : %i.%9.9i\n", secs, nsecs);
+                delete nEdgesOnEdgeSrc;
+                delete weightsOnEdgeSrc;
+                delete edgesOnEdgeSrc;
+                delete angleEdgeSrc;
+            }
+    
         }
-        
+    
         // Identifying which scalar qx's are available from src
         bool scalars_found[NUM_SCALARS];
         stat = nc_open(globalFieldFile, NC_SHARE, &ncid);
         if (stat != NC_NOERR) {
             throw stat;
         }
-        for (int i=0; i<NUM_SCALARS; i++) {
-            try {
-                int varid;
-                stat = nc_inq_varid(ncid, qxNames[i], &varid);
-                if (stat != NC_NOERR) throw stat;
-                std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
-                snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
-                qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
-                scalars_found[i] = true;
-            } catch (int e) {
-                std::cout << qxNames[i] << " not found in " << globalFieldFile << std::endl;
-                qxDst[i] = new NCField<float>();
-                scalars_found[i] = false;
+
+        if (!exclude_t_qx_rho) {
+            for (int i=0; i<NUM_SCALARS; i++) {
+                try {
+                    int varid;
+                    stat = nc_inq_varid(ncid, qxNames[i], &varid);
+                    if (stat != NC_NOERR) throw stat;
+                    std::cout << "found " << qxNames[i] << " in " << globalFieldFile << std::endl;
+                    snprintf(qxLbcName, (size_t)64, "%s", qxNames[i]);
+                    qxDst[i] = new NCField<float>(qxLbcName, 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+                    scalars_found[i] = true;
+                } catch (int e) {
+                    std::cout << qxNames[i] << " not found in " << globalFieldFile << std::endl;
+                    qxDst[i] = new NCField<float>();
+                    scalars_found[i] = false;
+                }
             }
         }
+
         stat = nc_close(ncid);
         if (stat != NC_NOERR) {
             throw stat;
@@ -499,74 +561,87 @@ int main(int argc, char **argv)
         start_timer(0);
         xtimeArr = xtime->ptr2D();
         snprintf(date, (size_t)20, "%s", xtimeArr[0]);
-        snprintf(targetFieldFile, (size_t)64, "interpolated.%s.nc", date);
+        snprintf(targetFieldFile, (size_t)64, outputFile, date);
         
         //
         // Create output file and define fields in it
         //
         stat = nc_create(targetFieldFile, NC_64BIT_DATA|NC_CLOBBER, &ncid);
         stat = xtime->defineInFile(ncid);
-        for (int i=0; i<NUM_SCALARS; i++) {
-            if (scalars_found[i]) {
-                stat = qxDst[i]->defineInFile(ncid);
+        if (!exclude_t_qx_rho) {
+            for (int i=0; i<NUM_SCALARS; i++) {
+                if (scalars_found[i]) {
+                    stat = qxDst[i]->defineInFile(ncid);
+                }
             }
         }
-        stat = uDst->defineInFile(ncid);
-        thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
-        stat = thetaDst->defineInFile(ncid);
-        rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
-        stat = rhoDst->defineInFile(ncid);
-        wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevelsP1", nVertLevels+1);
-        stat = wDst->defineInFile(ncid);
 
+        if (!exclude_winds) {
+            stat = uDst->defineInFile(ncid);
+        } 
+
+        if (!exclude_t_qx_rho) {
+            thetaDst = new NCField<float>("theta", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+            stat = thetaDst->defineInFile(ncid);
+            rhoDst = new NCField<float>("rho", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevels", nVertLevels);
+            stat = rhoDst->defineInFile(ncid);
+        }
+
+        if (!exclude_winds) {
+            wDst = new NCField<float>("w", 3, "Time", (size_t)1, "nCells", nCells, "nVertLevelsP1", nVertLevels+1);
+            stat = wDst->defineInFile(ncid);
+        }
 
         // Added by Todd Hutchinson during upgrade to be able to use ecmwf input
-        tmnDst = new NCField<float>("tmn", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = tmnDst->defineInFile(ncid);
+        //
+        if (!exclude_lsm_diag) {
+        
+            tmnDst = new NCField<float>("tmn", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = tmnDst->defineInFile(ncid);
 
-        skintempDst = new NCField<float>("skintemp", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = skintempDst->defineInFile(ncid);
+            skintempDst = new NCField<float>("skintemp", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = skintempDst->defineInFile(ncid);
 
-        snowDst = new NCField<float>("snow", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = snowDst->defineInFile(ncid);
+            snowDst = new NCField<float>("snow", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = snowDst->defineInFile(ncid);
 
-        snowcDst = new NCField<float>("snowc", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = snowcDst->defineInFile(ncid);
+            snowcDst = new NCField<float>("snowc", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = snowcDst->defineInFile(ncid);
 
-        snowhDst = new NCField<float>("snowh", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = snowhDst->defineInFile(ncid);
+            snowhDst = new NCField<float>("snowh", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = snowhDst->defineInFile(ncid);
 
-        xiceDst = new NCField<float>("xice", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = xiceDst->defineInFile(ncid);
+            xiceDst = new NCField<float>("xice", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = xiceDst->defineInFile(ncid);
 
-        seaiceDst = new NCField<float>("seaice", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = seaiceDst->defineInFile(ncid);
+            seaiceDst = new NCField<float>("seaice", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = seaiceDst->defineInFile(ncid);
 
-        smoisDst = new NCField<float>("smois", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
-        stat = smoisDst->defineInFile(ncid);
+            smoisDst = new NCField<float>("smois", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
+            stat = smoisDst->defineInFile(ncid);
 
+            tslbDst = new NCField<float>("tslb", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
+            stat = tslbDst->defineInFile(ncid);
 
-        tslbDst = new NCField<float>("tslb", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
-        stat = tslbDst->defineInFile(ncid);
+            dzsDst = new NCField<float>("dzs", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
+            stat = dzsDst->defineInFile(ncid);
 
+            u10Dst = new NCField<float>("u10", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = u10Dst->defineInFile(ncid);
 
-        dzsDst = new NCField<float>("dzs", 3, "Time", (size_t)1, "nCells", nCells, "nSoilLevels", nSoilLevels);
-        stat = dzsDst->defineInFile(ncid);
+            v10Dst = new NCField<float>("v10", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = v10Dst->defineInFile(ncid);
 
-        u10Dst = new NCField<float>("u10", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = u10Dst->defineInFile(ncid);
+            q2Dst = new NCField<float>("q2", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = q2Dst->defineInFile(ncid);
 
-        v10Dst = new NCField<float>("v10", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = v10Dst->defineInFile(ncid);
+            t2mDst = new NCField<float>("t2m", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = t2mDst->defineInFile(ncid);
 
-        q2Dst = new NCField<float>("q2", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = q2Dst->defineInFile(ncid);
+            presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", nCells);
+            stat = presDst->defineInFile(ncid);
 
-        t2mDst = new NCField<float>("t2m", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = t2mDst->defineInFile(ncid);
-
-        presDst = new NCField<float>("surface_pressure", 2, "Time", (size_t)1, "nCells", nCells);
-        stat = presDst->defineInFile(ncid);
+        }    
 
         stat = nc_enddef(ncid);
         
@@ -585,20 +660,22 @@ int main(int argc, char **argv)
         if (stat != NC_NOERR) {
             throw stat;
         }
-        for (int i=0; i<NUM_SCALARS; i++) {
-            if (scalars_found[i]) {
-                NCField<float> * qxSrc = new NCField<float>(src_ncid, qxNames[i]);
-        start_timer(0);
-                qxDst[i]->remapFrom(*qxSrc, *cellLayerMap, RemapperCell::barycentric);
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to remap qxName : %s %i.%9.9i\n", qxNames[i], secs, nsecs);
-        start_timer(0);
-                stat = qxDst[i]->writeToFile(ncid);
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to write scalars : %i.%9.9i\n", secs, nsecs);
-                if (stat != NC_NOERR) throw stat;
-                delete qxSrc;
-                delete qxDst[i];
+        if (!exclude_t_qx_rho) {
+            for (int i=0; i<NUM_SCALARS; i++) {
+                if (scalars_found[i]) {
+                    NCField<float> * qxSrc = new NCField<float>(src_ncid, qxNames[i]);
+                    start_timer(0);
+                    qxDst[i]->remapFrom(*qxSrc, *cellLayerMap, RemapperCell::barycentric);
+                    stop_timer(0, &secs, &nsecs);
+                    printf("Time to remap qxName : %s %i.%9.9i\n", qxNames[i], secs, nsecs);
+                    start_timer(0);
+                    stat = qxDst[i]->writeToFile(ncid);
+                    stop_timer(0, &secs, &nsecs);
+                    printf("Time to write qxName : %s %i.%9.9i\n", qxNames[i], secs, nsecs);
+                    if (stat != NC_NOERR) throw stat;
+                    delete qxSrc;
+                    delete qxDst[i];
+                }
             }
         }
         stat = nc_close(src_ncid);
@@ -610,206 +687,223 @@ int main(int argc, char **argv)
         //
         // Interpolate the zonal and meridional winds, and rotate the wind vector field so that u is the normal component
         //
-        start_timer(0);
-        if (!use_reconstruct_winds) {
-            uDst->remapFrom(*uSrc, *edgeMap);
-            vDst->remapFrom(*vSrc, *edgeMap);
-            delete uSrc;
-            delete vSrc;
-        } else {
-            uSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
-            uDst->remapFrom(*uSrc, *cellToEdgeMap);
-            delete uSrc;
-            vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
-            vDst->remapFrom(*vSrc, *cellToEdgeMap);
-            delete vSrc;
-        }
-        float *** uDstArr = uDst->ptr3D();
-        float *** vDstArr = vDst->ptr3D();
-        float * angleEdgeDstArr = angleEdgeDst->ptr1D();
-        rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
-        stat = uDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete uDst;
-        delete vDst;
+        if (!exclude_winds) {
+            start_timer(0);
+            if (!use_reconstruct_winds) {
+                uDst->remapFrom(*uSrc, *edgeMap);
+                vDst->remapFrom(*vSrc, *edgeMap);
+                delete uSrc;
+                delete vSrc;
+            } else {
+                uSrc = new NCField<float>(globalFieldFile, "uReconstructZonal");
+                uDst->remapFrom(*uSrc, *cellToEdgeMap);
+                delete uSrc;
+                vSrc = new NCField<float>(globalFieldFile, "uReconstructMeridional");
+                vDst->remapFrom(*vSrc, *cellToEdgeMap);
+                delete vSrc;
+            }
+            float *** uDstArr = uDst->ptr3D();
+            float *** vDstArr = vDst->ptr3D();
+            float * angleEdgeDstArr = angleEdgeDst->ptr1D();
+            rotate_winds(uDst->dimSize("nEdges"), uDst->dimSize("nVertLevels"), angleEdgeDstArr, uDstArr[0], vDstArr[0], 0);
+            stat = uDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete uDst;
+            delete vDst;
         
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to remap and write winds : %i.%9.9i\n", secs, nsecs);
-        
+            stop_timer(0, &secs, &nsecs);
+            printf("Time to remap and write winds : %i.%9.9i\n", secs, nsecs);
+        }            
+
         
         //
         // Interpolate scalar fields
         //
         
-        start_timer(0);
+        if (!exclude_t_qx_rho) {
+
+            printf("Remapping theta, rho, and w\n");
+
+            start_timer(0);
+            NCField<float> * thetaSrc = new NCField<float>(globalFieldFile, "theta");
+            thetaDst->remapFrom(*thetaSrc, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing theta\n");
+            stat = thetaDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete thetaSrc;
+            delete thetaDst;
+            stop_timer(0, &secs, &nsecs);
+            printf("Time to remap and write theta : %i.%9.9i\n", secs, nsecs);
+
+            start_timer(0);
+            NCField<float> * rhoSrc = new NCField<float>(globalFieldFile, "rho");
+            rhoDst->remapFrom(*rhoSrc, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing rho\n");
+            stat = rhoDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete rhoSrc;
+            delete rhoDst;
+            stop_timer(0, &secs, &nsecs);
+            printf("Time to remap and write rho : %i.%9.9i\n", secs, nsecs);
         
-        printf("Remapping other scalars\n");
-        NCField<float> * thetaSrc = new NCField<float>(globalFieldFile, "theta");
-        thetaDst->remapFrom(*thetaSrc, *cellLayerMap, RemapperCell::barycentric);
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to remap theta : %i.%9.9i\n", secs, nsecs);
-        start_timer(0);
-        printf("Writing theta\n");
-        stat = thetaDst->writeToFile(ncid);
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to write theta : %i.%9.9i\n", secs, nsecs);
-        start_timer(0);
-        if (stat != NC_NOERR) throw stat;
-        delete thetaSrc;
-        delete thetaDst;
+        }
+
+        if (!exclude_winds) {
+            start_timer(0);
+            NCField<float> * wSrc = new NCField<float>(globalFieldFile, "w");
+            wDst->remapFrom(*wSrc, *cellLevelMap, RemapperCell::barycentric);
+            printf("Writing w\n");
+            stat = wDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete wSrc;
+            delete wDst;
+            stop_timer(0, &secs, &nsecs);
+            printf("Time to remap and write w : %i.%9.9i\n", secs, nsecs);
+        }
+
+        if (!exclude_lsm_diag) {
+
+            printf("Remapping tmn, skintemp, snow, snowc, snowh, xice, seaice, smois, tslb, etc.\n");
+            start_timer(0);
+
+            NCField<float> * tmnSrc = new NCField<float>(globalFieldFile, "tmn");
+            tmnDst->remapFrom(*tmnSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing tmn\n");
+            stat = tmnDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete tmnSrc;
+            delete tmnDst;
+
+            NCField<float> * skintempSrc = new NCField<float>(globalFieldFile, "skintemp");
+            skintempDst->remapFrom(*skintempSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing skintemp\n");
+            stat = skintempDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete skintempSrc;
+            delete skintempDst;
+
+            NCField<float> * snowSrc = new NCField<float>(globalFieldFile, "snow");
+            snowDst->remapFrom(*snowSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing snow\n");
+            stat = snowDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete snowSrc;
+            delete snowDst;
+
+            NCField<float> * snowcSrc = new NCField<float>(globalFieldFile, "snowc");
+            snowcDst->remapFrom(*snowcSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing snowc\n");
+            stat = snowcDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete snowcSrc;
+            delete snowcDst;
+
+            NCField<float> * snowhSrc = new NCField<float>(globalFieldFile, "snowh");
+            snowhDst->remapFrom(*snowhSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing snowh\n");
+            stat = snowhDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete snowhSrc;
+            delete snowhDst;
+
+            NCField<float> * xiceSrc = new NCField<float>(globalFieldFile, "xice");
+            xiceDst->remapFrom(*xiceSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing xice\n");
+            stat = xiceDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete xiceSrc;
+            delete xiceDst;
         
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to remap and write theta : %i.%9.9i\n", secs, nsecs);
-
-        start_timer(0);
-        NCField<float> * rhoSrc = new NCField<float>(globalFieldFile, "rho");
-        rhoDst->remapFrom(*rhoSrc, *cellLayerMap, RemapperCell::barycentric);
-        printf("Writing rho\n");
-        stat = rhoDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete rhoSrc;
-        delete rhoDst;
+            NCField<float> * seaiceSrc = new NCField<float>(globalFieldFile, "seaice");
+            seaiceDst->remapFrom(*seaiceSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
+            printf("Writing seaice\n");
+            stat = seaiceDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete seaiceSrc;
+            delete seaiceDst;
         
-        NCField<float> * wSrc = new NCField<float>(globalFieldFile, "w");
-        wDst->remapFrom(*wSrc, *cellLevelMap, RemapperCell::barycentric);
-        printf("Writing w\n");
-        stat = wDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete wSrc;
-        delete wDst;
+            NCField<float> * smoisSrc = new NCField<float>(globalFieldFile, "smois");
+            smoisDst->remapFrom(*smoisSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
+            printf("Writing smois\n");
+            stat = smoisDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete smoisSrc;
+            delete smoisDst;
 
-        NCField<float> * tmnSrc = new NCField<float>(globalFieldFile, "tmn");
-        tmnDst->remapFrom(*tmnSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing tmn\n");
-        stat = tmnDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete tmnSrc;
-        delete tmnDst;
+            NCField<float> * tslbSrc = new NCField<float>(globalFieldFile, "tslb");
+            tslbDst->remapFrom(*tslbSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
+            printf("Writing tslb\n");
+            stat = tslbDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete tslbSrc;
+            delete tslbDst;
 
-        NCField<float> * skintempSrc = new NCField<float>(globalFieldFile, "skintemp");
-        skintempDst->remapFrom(*skintempSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing skintemp\n");
-        stat = skintempDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete skintempSrc;
-        delete skintempDst;
+            NCField<float> * dzsSrc = new NCField<float>(globalFieldFile, "dzs");
+            dzsDst->remapFrom(*dzsSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
+            printf("Writing dzs\n");
+            stat = dzsDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete dzsSrc;
+            delete dzsDst;
 
-        NCField<float> * snowSrc = new NCField<float>(globalFieldFile, "snow");
-        snowDst->remapFrom(*snowSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing snow\n");
-        stat = snowDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete snowSrc;
-        delete snowDst;
+            NCField<float> * u10Src = new NCField<float>(globalFieldFile, "u10");
+            u10Dst->remapFrom(*u10Src, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing u10\n");
+            stat = u10Dst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete u10Src;
+            delete u10Dst;
 
-        NCField<float> * snowcSrc = new NCField<float>(globalFieldFile, "snowc");
-        snowcDst->remapFrom(*snowcSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing snowc\n");
-        stat = snowcDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete snowcSrc;
-        delete snowcDst;
+            NCField<float> * v10Src = new NCField<float>(globalFieldFile, "v10");
+            v10Dst->remapFrom(*v10Src, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing v10\n");
+            stat = v10Dst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete v10Src;
+            delete v10Dst;
 
-        NCField<float> * snowhSrc = new NCField<float>(globalFieldFile, "snowh");
-        snowhDst->remapFrom(*snowhSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing snowh\n");
-        stat = snowhDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete snowhSrc;
-        delete snowhDst;
+            NCField<float> * q2Src = new NCField<float>(globalFieldFile, "q2");
+            q2Dst->remapFrom(*q2Src, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing q2\n");
+            stat = q2Dst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete q2Src;
+            delete q2Dst;
 
-        NCField<float> * xiceSrc = new NCField<float>(globalFieldFile, "xice");
-        xiceDst->remapFrom(*xiceSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing xice\n");
-        stat = xiceDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete xiceSrc;
-        delete xiceDst;
+            NCField<float> * t2mSrc = new NCField<float>(globalFieldFile, "t2m");
+            t2mDst->remapFrom(*t2mSrc, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing t2m\n");
+            stat = t2mDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete t2mSrc;
+            delete t2mDst;
+
+            NCField<float> * presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
+            presDst->remapFrom(*presSrc, *cellLayerMap, RemapperCell::barycentric);
+            printf("Writing surface_pressure\n");
+            stat = presDst->writeToFile(ncid);
+            if (stat != NC_NOERR) throw stat;
+            delete presSrc;
+            delete presDst;
         
-        NCField<float> * seaiceSrc = new NCField<float>(globalFieldFile, "seaice");
-        seaiceDst->remapFrom(*seaiceSrc, *cellLayerMap, RemapperCell::nearest_samelandmask);
-        printf("Writing seaice\n");
-        stat = seaiceDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete seaiceSrc;
-        delete seaiceDst;
-        
-        NCField<float> * smoisSrc = new NCField<float>(globalFieldFile, "smois");
-        smoisDst->remapFrom(*smoisSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
-        printf("Writing smois\n");
-        stat = smoisDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete smoisSrc;
-        delete smoisDst;
-
-        NCField<float> * tslbSrc = new NCField<float>(globalFieldFile, "tslb");
-        tslbDst->remapFrom(*tslbSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
-        printf("Writing tslb\n");
-        stat = tslbDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete tslbSrc;
-        delete tslbDst;
-
-        NCField<float> * dzsSrc = new NCField<float>(globalFieldFile, "dzs");
-        dzsDst->remapFrom(*dzsSrc, *cellLayerMap, RemapperCell::nearest_samelandmask_soil);
-        printf("Writing dzs\n");
-        stat = dzsDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete dzsSrc;
-        delete dzsDst;
-
-        NCField<float> * u10Src = new NCField<float>(globalFieldFile, "u10");
-        u10Dst->remapFrom(*u10Src, *cellLayerMap, RemapperCell::barycentric);
-        printf("Writing u10\n");
-        stat = u10Dst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete u10Src;
-        delete u10Dst;
-
-        NCField<float> * v10Src = new NCField<float>(globalFieldFile, "v10");
-        v10Dst->remapFrom(*v10Src, *cellLayerMap, RemapperCell::barycentric);
-        printf("Writing v10\n");
-        stat = v10Dst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete v10Src;
-        delete v10Dst;
-
-        NCField<float> * q2Src = new NCField<float>(globalFieldFile, "q2");
-        q2Dst->remapFrom(*q2Src, *cellLayerMap, RemapperCell::barycentric);
-        printf("Writing q2\n");
-        stat = q2Dst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete q2Src;
-        delete q2Dst;
-
-        NCField<float> * t2mSrc = new NCField<float>(globalFieldFile, "t2m");
-        t2mDst->remapFrom(*t2mSrc, *cellLayerMap, RemapperCell::barycentric);
-        printf("Writing t2m\n");
-        stat = t2mDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete t2mSrc;
-        delete t2mDst;
-
-        NCField<float> * presSrc = new NCField<float>(globalFieldFile, "surface_pressure");
-        presDst->remapFrom(*presSrc, *cellLayerMap, RemapperCell::barycentric);
-        printf("Writing surface_pressure\n");
-        stat = presDst->writeToFile(ncid);
-        if (stat != NC_NOERR) throw stat;
-        delete presSrc;
-        delete presDst;
-        
-        stop_timer(0, &secs, &nsecs);
-        printf("Time to remap and write other fields : %i.%9.9i\n", secs, nsecs);
+            stop_timer(0, &secs, &nsecs);
+            printf("Time to remap and write LSM fields and general diagnostics : %i.%9.9i\n", secs, nsecs);
+ 
+        }
         
         stat = nc_close(ncid);
         
     }
     
-    
-    if (use_reconstruct_winds)
-        delete cellToEdgeMap;
-    else
-        delete edgeMap;
+    if (!exclude_winds) {
+        if (use_reconstruct_winds) {
+            delete cellToEdgeMap;
+        }
+        else {
+            delete edgeMap;
+        }
+    }
+        
     delete angleEdgeDst;
     delete cellLayerMap;
     delete cellLevelMap;
